@@ -342,8 +342,13 @@ directory using `ARGV << "--confdir" << "/etc/puppet"`.  Please see the
 If you need to programmatically work with the Puppet version, please use the
 following:
 
+    # If working from the git source repo, these tasks lay down the version file
+    rake package:bootstrap
+    rake package:version_file
+
+    # Then get the version (if working from a released tarball or package, just skip to here):
     require 'puppet/version'
-    # Get the version baked into the sourcecode:
+    # Get the latest version:
     version = Puppet.version
     # Set the version (e.g. in a Rakefile based on `git describe`)
     Puppet.version = '2.3.4'

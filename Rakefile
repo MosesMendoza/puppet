@@ -2,7 +2,6 @@
 
 # We need access to the Puppet.version method
 $LOAD_PATH.unshift(File.expand_path("lib"))
-require 'puppet/version'
 
 $LOAD_PATH << File.join(File.dirname(__FILE__), 'tasks')
 
