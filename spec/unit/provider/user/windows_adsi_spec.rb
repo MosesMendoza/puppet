@@ -26,6 +26,7 @@ describe Puppet::Type.type(:user).provider(:windows_adsi), :if => Puppet.feature
       stub_users = names.map{|n| stub(:name => n)}
       connection.stubs(:execquery).with('select name from win32_useraccount where localaccount = "TRUE"').returns(stub_users)
 
+      #TODO: should never call logon_user
       expect(described_class.instances.map(&:name)).to match(names)
     end
   end
@@ -224,6 +225,21 @@ describe Puppet::Type.type(:user).provider(:windows_adsi), :if => Puppet.feature
       provider.user.expects(:password_is?).with('plaintext').returns false
 
       expect(provider.password).to be_nil
+    end
+
+    it "should generate a warning with an empty password" do
+      resource[:password] = ''
+
+      # expect
+    end
+
+    it "should generate a warning with a nil password" do
+      # TODO: can we use error code 1327 to identify that a user in fact has an empty password
+      # i.e. is the error code returned when logging in unsuccessfully with a valid empty password
+      # any different than trying to login with an invalid non-empty password?
+      resource[:password] = ''
+
+      # expect
     end
 
     it 'should not create a user if a group by the same name exists' do
