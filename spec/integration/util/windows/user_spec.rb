@@ -106,8 +106,13 @@ describe "Puppet::Util::Windows::User", :if => Puppet.features.microsoft_windows
         expect(Puppet::Util::Windows::User.password_is?(username, bad_password)).to be_falsey
       end
 
-      it "should raise an error given a nil password" do
-        expect { Puppet::Util::Windows::User.password_is?(username, nil) }.to raise_error(Puppet::Util::Windows::Error)
+      it "should return false given a nil password" do
+        expect(Puppet::Util::Windows::User.password_is?(username, nil)).to be_falsey
+      end
+
+      it "should warn that empty/nil passwords cannot be verified given a nil password" do
+        Puppet::Util::Windows::User.password_is?(username, nil)
+        expect(@logs).to have_matching_log(/does not have the ability to verify NULL or empty passwords/)
       end
 
       it "should return false given a nil username and an incorrect password" do
