@@ -124,7 +124,11 @@ Puppet::Type.type(:user).provide :windows_adsi do
   end
 
   def password=(value)
-    # TODO: emit Puppet debug message here about setting a property that we can't verify when this is nil or ''
+    if value.nil?
+      Puppet.warning("Puppet does not support setting a nil password on Windows.")
+    elsif value == ''
+      Puppet.warning("Blank (zero length) passwords are not recommended. Blank passwords may be allowed on your system based on policy, but Puppet cannot verify a blank password with the operating system. Because of this a password change event will be executed by Puppet on every run.")
+    end
     user.password = value
   end
 

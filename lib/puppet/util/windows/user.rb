@@ -56,12 +56,9 @@ module Puppet::Util::Windows::User
     # Logon failure: user account restriction. Possible reasons are blank passwords
     # not allowed, logon hour restrictions, or a policy restriction has been enforced.
     if password.nil? || password == ''
-      raise Puppet::Util::Windows::Error.new(
-        "Windows does not have the ability to verify NULL or empty passwords"
-      )
+      Puppet.warning("Windows does not have the ability to verify NULL or empty passwords")
+      return false
     end
-    # TODO: maybe do this instead? -  return false if password.nil? || password == ''
-
     begin
       logon_user(name, password) { |token| }
     rescue Puppet::Util::Windows::Error

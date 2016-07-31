@@ -26,13 +26,22 @@ describe Puppet::Type.type(:user).provider(:windows_adsi), :if => Puppet.feature
       stub_users = names.map{|n| stub(:name => n)}
       connection.stubs(:execquery).with('select name from win32_useraccount where localaccount = "TRUE"').returns(stub_users)
 
-      #TODO: should never call logon_user
       expect(described_class.instances.map(&:name)).to match(names)
     end
   end
 
   it "should provide access to a Puppet::Util::Windows::ADSI::User object" do
     expect(provider.user).to be_a(Puppet::Util::Windows::ADSI::User)
+  end
+
+  describe "when retrieving the password property" do
+    context "when the resource has a nil password" do
+      it "should never issue a logon attempt" do
+        resource.stubs(:[]).with(any_of(:name, :password)).returns(nil)
+        Puppet::Util::Windows::User.expects(:logon_user).never
+        provider.password
+      end
+    end
   end
 
   describe "when managing groups" do
@@ -228,18 +237,18 @@ describe Puppet::Type.type(:user).provider(:windows_adsi), :if => Puppet.feature
     end
 
     it "should generate a warning with an empty password" do
-      resource[:password] = ''
-
-      # expect
+      provider.user.expects(:password=).with('')
+      provider.password = ''
+      expect(@logs).to have_matching_log(/Puppet cannot verify a blank password with the operating system/)
     end
 
     it "should generate a warning with a nil password" do
       # TODO: can we use error code 1327 to identify that a user in fact has an empty password
       # i.e. is the error code returned when logging in unsuccessfully with a valid empty password
       # any different than trying to login with an invalid non-empty password?
-      resource[:password] = ''
-
-      # expect
+      provider.user.expects(:password=).with(nil)
+      provider.password = nil
+      expect(@logs).to have_matching_log(/Puppet does not support setting a nil password on Windows/)
     end
 
     it 'should not create a user if a group by the same name exists' do
