@@ -19,5 +19,16 @@ test_name 'PA-466: Ensure version file is created on agent' do
       end
     end
   end
+  step "test for existence of a kmnown file" do
+    agents.each do |agent|
+      version_file = agent[:platform] =~ /windows/ ?
+        'C:/Program Files' :
+        '/opt/puppetlabs/puppet/VERSION'
+
+      if !dir_exists?(agent, version_file)
+        fail_test("Failed to find version file #{version_file} on agent #{agent}")
+      end
+    end
+  end
 end
 
