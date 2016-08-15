@@ -10,9 +10,16 @@ test_name 'PA-466: Ensure version file is created on agent' do
 
   step "test for existence of version file" do
     agents.each do |agent|
-      version_file = agent[:platform] =~ /windows/ ?
-        'C:/Program Files/Puppet Labs/Puppet/VERSION' :
-        '/opt/puppetlabs/puppet/VERSION'
+      platform = host[:platform]
+      ruby_arch = host[:ruby_arch] || 'x86' # ruby_arch defaults to x86 if nil
+
+      if platform =~ /windows/
+        version_file = platform =~ /-64$/ && ruby_arch == 'x86' ?
+          "C:/Program Files (x86)/Puppet Labs/Puppet/VERSION" :
+          "C:/Program Files/Puppet Labs/Puppet/VERSION"
+      else
+        version_file = "/opt/puppetlabs/puppet/VERSION"
+      end
 
       if !file_exists?(agent, version_file)
         fail_test("Failed to find version file #{version_file} on agent #{agent}")
