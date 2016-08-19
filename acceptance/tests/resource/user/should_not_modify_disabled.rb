@@ -17,8 +17,6 @@ user {'#{name}':
 }
 MANIFEST
 
-  password_change_notice = %r{User\[#{name}\]/password: changed password}
-
   agents.each do |agent|
     step "create user #{name} with puppet" do
       apply_manifest_on(agent, manifest, :catch_failures => true)
@@ -29,9 +27,9 @@ MANIFEST
     end
 
     step "test that password is not reset by puppet" do
-      apply_manifest_on(agent, manifest, :catch_failures => true) do |result|
-        assert_no_match(password_change_notice, result.stdout, "Unexpected password change notice for disabled user #{name}")
-      end
+      # :catch_changes will fail the test if there were changes during
+      # run execution
+      apply_manifest_on(agent, manifest, :catch_changes => true)
     end
   end
 end
