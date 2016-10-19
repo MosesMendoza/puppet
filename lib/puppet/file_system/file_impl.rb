@@ -28,7 +28,22 @@ class Puppet::FileSystem::FileImpl
   end
 
   def open(path, mode, options, &block)
-    ::File.open(path, options, mode, &block)
+    begin
+      ::File.open(path, options, mode, :encoding => 'BOM|UTF-8', &block)
+    rescue TypeError => detail
+      if mode.is_a?(Hash)
+        opts = mode.merge(:encoding => 'BOM|UTF-8')
+        ::File.open(path, options, opts, &block)
+      else
+        raise detail
+      end
+    rescue ArgumentError => detail
+      if detail.message == 'encoding specified twice'
+        ::File.open(path, options, opts, &block)
+      else
+        raise detail
+      end
+    end
   end
 
   def dir(path)
