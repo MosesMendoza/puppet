@@ -25,14 +25,15 @@ describe "Puppet::FileSystem" do
   end
 
   context "#open" do
-    it "uses a default mode of 100644, the same as File.open, when specifying a nil mode" do
+    it "uses a default mode based on umask, the same as File.open, when specifying a nil mode" do
       file = tmpfile('file_to_update')
       expect(Puppet::FileSystem.exist?(file)).to be_falsey
 
       Puppet::FileSystem.open(file, nil, 'a') { |fh| fh.write('') }
 
-      # default mode of 0644 is applied
-      expect(File.stat(file).mode.to_s(8)).to eq('100644')
+      expected_perms = 666 - File.umask.to_s(8).to_i
+      # default mode is applied. 100 == 'regular file'
+      expect(File.stat(file).mode.to_s(8)).to eq("100#{expected_perms}")
 
       default_file = tmpfile('file_to_update2')
       expect(Puppet::FileSystem.exist?(default_file)).to be_falsey
