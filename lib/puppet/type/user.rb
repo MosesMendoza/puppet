@@ -171,10 +171,17 @@ module Puppet
 
     newproperty(:comment) do
       desc "A description of the user.  Generally the user's full name."
-      if RUBY_VERSION < "2.1.0"
-        munge do |v|
-          v.respond_to?(:force_encoding) ? v.force_encoding(Encoding::ASCII_8BIT) : v
+      # Std::Etc module < 2.1.0 always returns binary encoding and >= 2.1.0 will
+      # return binary encoding if it contains characters incompatible with
+      # current locale charset (Encoding.default_external). Avoid unneeded
+      # property 'sync' if the resource _current_ value is in BINARY and the
+      # _should_ value isn't. This also prevents later concatenation of strings
+      # with incompatible encodings. #PUP-6777
+      def property_matches?(current, desired)
+        if ([current, desired].all? { |v| v.respond_to?(:encoding) } and current.encoding == Encoding::ASCII_8BIT)
+          desired.force_encoding(Encoding::ASCII_8BIT)
         end
+        super(current, desired)
       end
     end
 
