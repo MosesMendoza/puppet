@@ -539,6 +539,7 @@ class Puppet::Parameter
   #
   # @return [String]
   def format(fmt, *args)
+    # TODO handle incompatible encodings
     fmt % args.map { |arg| @sensitive ? "[redacted]" : arg.to_s }
   end
 
