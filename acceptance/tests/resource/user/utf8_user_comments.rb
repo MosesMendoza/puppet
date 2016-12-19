@@ -1,6 +1,6 @@
 # ensure a user can be managed with UTF-8 only comments in the following scenarios:
 test_name 'PUP-6777 Manage users with UTF-8 comments' do
-  confine :except, :platform => 'windows'
+  #confine :except, :platform => 'windows'
 
   user0 = "foo#{rand(99999).to_i}"
   user1 = "bar#{rand(99999).to_i}"

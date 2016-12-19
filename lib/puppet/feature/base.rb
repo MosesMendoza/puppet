@@ -18,7 +18,7 @@ Puppet.features.add(:microsoft_windows) do
   begin
     # ruby
     require 'Win32API'          # case matters in this require!
-    require 'win32ole'
+    require 'win32ole' ; WIN32OLE.codepage = 65001
     # gems
     require 'win32/process'
     require 'win32/dir'
