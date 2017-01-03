@@ -160,8 +160,6 @@ class Puppet::Configurer
     nil
   end
 
-  # Retrieve (optionally) and apply a catalog. If a catalog is passed in
-  # the options, then apply that one, otherwise retrieve it.
   def apply_catalog(catalog, options)
     report = options[:report]
     begin
