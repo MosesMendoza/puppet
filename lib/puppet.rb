@@ -93,13 +93,10 @@ module Puppet
   require 'puppet/util/logging'
   extend Puppet::Util::Logging
 
-  # Setup facter's logging
   Puppet::Util::Logging.setup_facter_logging!
 
-  # The feature collection
   @features = Puppet::Util::Feature.new('puppet/feature')
 
-  # Load the base features.
   require 'puppet/feature/base'
 
   # Store a new default value.
@@ -107,7 +104,6 @@ module Puppet
     @@settings.define_settings(section, hash)
   end
 
-  # setting access and stuff
   def self.[]=(param,value)
     @@settings[param] = value
   end
