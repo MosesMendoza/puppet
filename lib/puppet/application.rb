@@ -411,7 +411,6 @@ class Application
   end
 
   def parse_options
-    # Create an option parser
     option_parser = OptionParser.new(self.class.banner)
 
     # Here we're building up all of the options that the application may need to handle.  The main
