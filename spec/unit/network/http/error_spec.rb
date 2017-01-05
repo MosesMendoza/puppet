@@ -15,15 +15,15 @@ describe Puppet::Network::HTTP::Error do
   end
 
   describe Puppet::Network::HTTP::Error::HTTPServerError do
-    it "should serialize to JSON that matches the error schema and has the optional stacktrace property" do
+    it "should serialize to JSON that matches the error schema and has a deprecated stacktrace property" do
       begin
         raise Exception, "a wild Exception appeared!"
       rescue Exception => e
         culpable = e
       end
       error = Puppet::Network::HTTP::Error::HTTPServerError.new(culpable)
-
       expect(error.to_json).to validate_against('api/schemas/error.json')
+      expect(error.to_json).to match(/The 'stacktrace' property is deprecated/)
     end
   end
 
