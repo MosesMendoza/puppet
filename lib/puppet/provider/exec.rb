@@ -9,6 +9,8 @@ class Puppet::Provider::Exec < Puppet::Provider
     status = nil
     dir = nil
 
+    debug_msg = resource.parameters[:command].sensitive ? "[redacted]" : command
+
     checkexe(command)
 
     if dir = resource[:cwd]
@@ -23,7 +25,7 @@ class Puppet::Provider::Exec < Puppet::Provider
 
     dir ||= Dir.pwd
 
-    debug "Executing#{check ? " check": ""} '#{command}'"
+    debug "Executing#{check ? " check": ""} '#{debug_msg}'"
     begin
       # Do our chdir
       Dir.chdir(dir) do
@@ -59,7 +61,8 @@ class Puppet::Provider::Exec < Puppet::Provider
           output = Puppet::Util::Execution.execute(command, :failonfail => false, :combine => true,
                                   :uid => resource[:user], :gid => resource[:group],
                                   :override_locale => false,
-                                  :custom_environment => environment)
+                                  :custom_environment => environment,
+                                  :sensitive => resource.parameters[:command].sensitive)
         end
         # The shell returns 127 if the command is missing.
         if output.exitstatus == 127

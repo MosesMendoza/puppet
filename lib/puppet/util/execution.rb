@@ -153,6 +153,7 @@ module Puppet::Util::Execution
         :squelch => false,
         :override_locale => true,
         :custom_environment => {},
+        :redacted => false,
     }
 
     options = default_options.merge(options)
@@ -175,12 +176,12 @@ module Puppet::Util::Execution
       user_log_s.prepend(' with')
     end
 
+    debug_msg = options[:sensitive] ? "'[redacted]'" : "'#{str}'"
     if respond_to? :debug
-      debug "Executing#{user_log_s}: '#{str}'"
+      debug "Executing#{user_log_s}: #{debug_msg}"
     else
-      Puppet.debug "Executing#{user_log_s}: '#{str}'"
+      Puppet.debug "Executing#{user_log_s}: #{debug_msg}"
     end
-
     null_file = Puppet.features.microsoft_windows? ? 'NUL' : '/dev/null'
 
     begin
