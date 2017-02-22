@@ -1,5 +1,14 @@
-require 'puppet/util/windows'
 require 'ffi'
+
+# Puppet::Util::Windows::EventLog needs to be requirable without having loaded
+# any other parts of Puppet so it can be leveraged independently by the code
+# that runs Puppet as a service on Windows.
+#
+# For this reason we:
+# - Define Puppet::Util::Windows
+# - Replicate logic that exists elsewhere in puppet/util/windows
+# - Raise generic RuntimeError instead of Puppet::Util::Windows::Error if its not defined
+module Puppet; module Util; module Windows ; end ; end ; end
 
 class Puppet::Util::Windows::EventLog
   extend FFI::Library
@@ -14,18 +23,19 @@ class Puppet::Util::Windows::EventLog
   # @return [void]
   # @api public
   def initialize(source_name = 'Puppet')
-    @eventlog_handle = RegisterEventSourceW(nil, Puppet::Util::Windows::String.wide_string(source_name))
-    if @eventlog_handle == FFI::Pointer::NULL_HANDLE
-      raise Puppet::Util::Windows::Error.new("failed to open Windows eventlog")
+    @eventlog_handle = RegisterEventSourceW(nil, wide_string(source_name))
+    if @eventlog_handle == NULL_HANDLE
+      raise EventlogError.new("failed to open Windows eventlog")
     end
   end
 
   # Close this instance's event log handle
   # @return [void]
+  # @api public
   def close
     result_of_close = DeregisterEventSource(@eventlog_handle)
-    if result_of_close == FFI::WIN32_FALSE
-      raise Puppet::Util::Windows::Error.new("failed to close Windows eventlog")
+    if result_of_close == WIN32_FALSE
+      raise EventlogError.new("failed to close Windows eventlog")
     end
     @eventlog_handle = nil
   end
@@ -39,9 +49,10 @@ class Puppet::Util::Windows::EventLog
   #
   # @param args [Hash{Symbol=>Object}] options to the associated log event
   # @return [void]
+  # @api public
   def report_event(args = {})
     raise ArgumentError, "data must be a string, not #{args[:data].class}" unless args[:data].is_a?(String)
-    FFI::MemoryPointer.from_string_to_wide_string(args[:data]) do |message_ptr|
+    from_string_to_wide_string(args[:data]) do |message_ptr|
       FFI::MemoryPointer.new(:pointer, 2) do |message|
         message[0].write_pointer(message_ptr)
         user_sid, raw_data = nil
@@ -52,8 +63,8 @@ class Puppet::Util::Windows::EventLog
           eventlog_category, args[:event_id], user_sid,
           num_strings, raw_data_size, message, raw_data)
 
-        if report_result == FFI::WIN32_FALSE
-          raise Puppet::Util::Windows::Error.new("failed to report event to Windows eventlog")
+        if report_result == WIN32_FALSE
+          raise EventlogError.new("failed to report event to Windows eventlog")
         end
       end
     end
@@ -66,6 +77,7 @@ class Puppet::Util::Windows::EventLog
     # Query event identifier info for a given log level
     # @param level [Symbol] an event log level
     # @return [Array] Win API Event ID, Puppet Event ID
+    # @api public
     def to_native(level)
       case level
       when :debug,:info,:notice
@@ -80,7 +92,61 @@ class Puppet::Util::Windows::EventLog
     end
   end
 
+  private
+  # For the purposes of allowing this class to be standalone, the following are
+  # duplicate definitions from elsewhere in Puppet:
+  NULL_HANDLE = 0
+  WIN32_FALSE = 0
+
+  # If we're loaded via Puppet we should keep the previous behavior of raising
+  # Puppet::Util::Windows::Error on errors. For daemon.rb we don't have
+  # Puppet::Util::Windows::Error, but daemon.rb just silently blanket rescues
+  # all Exceptions raised during a log attempt, so we're fine just raising a
+  # generic RuntimeError.
+  EventlogError = defined?(Puppet::Util::Windows::Error) ? Puppet::Util::Windows::Error : RuntimeError
+
+  # Private duplicate of Puppet::Util::Windows::String::wide_string
+  # Not for use outside of EventLog! - use Puppet::Util::Windows instead
+  # @api private
+  def wide_string(str)
+    # if given a nil string, assume caller wants to pass a nil pointer to win32
+    return nil if str.nil?
+    # ruby (< 2.1) does not respect multibyte terminators, so it is possible
+    # for a string to contain a single trailing null byte, followed by garbage
+    # causing buffer overruns.
+    #
+    # See http://svn.ruby-lang.org/cgi-bin/viewvc.cgi?revision=41920&view=revision
+    newstr = str + "\0".encode(str.encoding)
+    newstr.encode!('UTF-16LE')
+  end
+
+  # Private duplicate of Puppet::Util::Windows::ApiTypes::from_string_to_wide_string
+  # Not for use outside of EventLog! - Use Puppet::Util::Windows instead
+  # @api private
+  def from_string_to_wide_string(str, &block)
+    str = wide_string(str)
+    FFI::MemoryPointer.new(:uchar, str.bytesize) do |ptr|
+      # uchar here is synonymous with byte
+      ptr.put_array_of_uchar(0, str.bytes.to_a)
+
+      yield ptr
+    end
+
+    # ptr has already had free called, so nothing to return
+    nil
+  end
+
   ffi_convention :stdcall
+
+  # The following are typedefs in Puppet::Util::Winodws::ApiTypes, but here we
+  # use their original FFI counterparts:
+  # :buffer_inout for :lpwstr
+  # :uintptr_t for :handle
+  # :int32 for :win32_bool
+  # :uint16 for :word
+  # :uint32 for :dword
+  # :pointer for :lpvoid
+  # :uchar for :byte
 
   # https://msdn.microsoft.com/en-us/library/windows/desktop/aa363678(v=vs.85).aspx
   # HANDLE RegisterEventSource(
@@ -88,14 +154,14 @@ class Puppet::Util::Windows::EventLog
   # _In_ LPCTSTR lpSourceName
   # );
   ffi_lib :advapi32
-  attach_function_private :RegisterEventSourceW, [:lpwstr, :lpwstr], :handle
+  attach_function :RegisterEventSourceW, [:buffer_inout, :buffer_inout], :uintptr_t
 
   # https://msdn.microsoft.com/en-us/library/windows/desktop/aa363642(v=vs.85).aspx
   # BOOL DeregisterEventSource(
   # _Inout_ HANDLE hEventLog
   # );
   ffi_lib :advapi32
-  attach_function_private :DeregisterEventSource, [:handle], :win32_bool
+  attach_function :DeregisterEventSource, [:uintptr_t], :int32
 
   # https://msdn.microsoft.com/en-us/library/windows/desktop/aa363679(v=vs.85).aspx
   # BOOL ReportEvent(
@@ -110,5 +176,5 @@ class Puppet::Util::Windows::EventLog
   #   _In_ LPVOID  lpRawData
   # );
   ffi_lib :advapi32
-  attach_function_private :ReportEventW, [:handle, :word, :word, :dword, :pointer, :word, :dword, :lpwstr, :lpvoid], :win32_bool
+  attach_function :ReportEventW, [:uintptr_t, :uint16, :uint16, :uint32, :pointer, :uint16, :uint32, :buffer_inout, :pointer], :int32
 end
