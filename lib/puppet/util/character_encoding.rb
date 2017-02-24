@@ -1,5 +1,4 @@
 # A module to centralize heuristics/practices for managing character encoding in Puppet
-require 'puppet/util'
 
 module Puppet::Util::CharacterEncoding
   class << self
