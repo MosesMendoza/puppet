@@ -4,7 +4,6 @@ require 'fileutils'
 require 'win32/daemon'
 require 'win32/dir'
 require 'win32/process'
-require 'win32/eventlog'
 
 # This file defines utilities for logging to eventlog. While it lives inside
 # Puppet, it is completely independent and loads no other parts of Puppet, so we
@@ -137,9 +136,8 @@ class WindowsDaemon < Win32::Daemon
   def report_windows_event(type,id,message)
     begin
       eventlog = nil
-      eventlog = Win32::EventLog.open("Application")
+      eventlog = Puppet::Util::Windows::EventLog.open("Puppet")
       eventlog.report_event(
-        :source      => "Puppet",
         :event_type  => type,   # EVENTLOG_ERROR_TYPE, etc
         :event_id    => id,     # 0x01 or 0x02, 0x03 etc.
         :data        => message # "the message"
