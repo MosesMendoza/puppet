@@ -10,6 +10,8 @@ require 'puppet/util/character_encoding'
 #
 # We only use Etc for retrieving existing property values from the system. For
 # setting property values, providers leverage system tools (i.e., `useradd`)
+#
+# @api private
 module Puppet::Etc
   class << self
     # Etc::getgrent returns an Etc::Group struct object
@@ -94,20 +96,26 @@ module Puppet::Etc
     end
 
     private
-    # utility method for converting the values of a struct returned by the Etc
-    # module to UTF-8.
+    # Utility method for converting the String values of a struct returned by
+    # the Etc module to UTF-8. Structs returned by the ruby Etc module contain
+    # members with fields of type String, Integer, or Array of Strings, so we
+    # handle these types. Otherwise ignore fields.
+    #
+    # NOTE: If a string cannot be converted to UTF-8, this leaves the original
+    # string string intact in the Struct.
     #
     # Warning! This is a destructive method - the struct passed is modified!
     #
-    # Structs returned by the ruby Etc module contain members with
-    # fields of type String, Integer, or Array of Strings, so we handle these
-    # types. Otherwise ignore fields.
+    # @api private
+    # @param [Etc::Passwd or Etc::Group struct]
+    # @return [Etc::Passwd or Etc::Group struct] the original struct with values
+    #   converted to UTF-8 if possible, or the original value intact if not
     def convert_field_values_to_utf8!(struct)
       struct.each_with_index do |value, index|
         if value.is_a?(String)
-          struct[index] = Puppet::Util::CharacterEncoding.convert_to_utf_8(value)
+          struct[index] = Puppet::Util::CharacterEncoding.convert_to_utf_8(value) rescue value
         elsif value.is_a?(Array) && value.all? { |elem| elem.is_a?(String) }
-          struct[index] = value.map! { |elem| Puppet::Util::CharacterEncoding.convert_to_utf_8(elem) }
+          struct[index] = value.map! { |elem| Puppet::Util::CharacterEncoding.convert_to_utf_8(elem) rescue elem }
         end # Integer or other type
       end
     end
