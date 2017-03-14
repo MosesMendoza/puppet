@@ -66,7 +66,8 @@ module Puppet::Util::CharacterEncoding
         # catch both our own self-determined failure to transcode as well as any
         # error on ruby's part, ie Encoding::InvalidByteSequenceError or
         # Encoding::UndefinedConversionError.
-        raise Puppet::Error, _("#{detail.inspect}: #{value_to_encode.dump} is not valid UTF-8 and cannot be transcoded by Puppet.")
+        raise Puppet::Error.new(_("%{inspect}: %{value} is not valid UTF-8 and cannot be transcoded by Puppet.") %
+          { inspect: detail.inspect, value: value_to_encode.dump }, detail)
       end
 
       return value_to_encode
