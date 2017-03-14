@@ -113,10 +113,32 @@ module Puppet::Etc
     def convert_field_values_to_utf8!(struct)
       struct.each_with_index do |value, index|
         if value.is_a?(String)
-          struct[index] = Puppet::Util::CharacterEncoding.convert_to_utf_8(value) rescue value
+          begin
+            struct[index] = Puppet::Util::CharacterEncoding.convert_to_utf_8(value)
+          rescue Puppet::Error
+            # struct[index] unmodified
+          end
         elsif value.is_a?(Array) && value.all? { |elem| elem.is_a?(String) }
-          struct[index] = value.map! { |elem| Puppet::Util::CharacterEncoding.convert_to_utf_8(elem) rescue elem }
-        end # Integer or other type
+          struct[index] = convert_array_values_to_utf8!(value)
+        end
+      end
+    end
+
+    # Helper method for ::convert_field_values_to_utf8!
+    #
+    # Warning! This is a destructive method - the array passed is modified!
+    #
+    # @api private
+    # @param [Array] object containing String values to convert to UTF-8
+    # @return [Array] original Array with String values converted to UTF-8 if
+    #   convertible, or original, unmodified values if not.
+    def convert_array_values_to_utf8!(string_array)
+      string_array.map! do |elem|
+        begin
+          Puppet::Util::CharacterEncoding.convert_to_utf_8(elem)
+        rescue Puppet::Error
+          elem # individual array element unmodified
+        end
       end
     end
   end
