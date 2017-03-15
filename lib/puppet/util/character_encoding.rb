@@ -14,10 +14,8 @@ module Puppet::Util::CharacterEncoding
     def convert_to_utf_8(string)
       return string if string.encoding == Encoding::UTF_8
 
-      value_to_encode = string.dup
-
       begin
-        if valid_utf_8?(value_to_encode)
+        if valid_utf_8?(string)
           # Before we try to transcode the string, check if it is valid UTF-8 as
           # currently constitued (in its non-UTF-8 encoding), and if it is, limit
           # ourselves to setting the external encoding of the string to UTF-8
@@ -50,13 +48,13 @@ module Puppet::Util::CharacterEncoding
           # UTF-8. We can only guess, so if the string is valid UTF-8 as
           # currently constituted, we default to assuming the string originated
           # in UTF-8 and do not transcode it - we only set external encoding.
-          value_to_encode.force_encoding(Encoding::UTF_8)
-        elsif transcodable?(value_to_encode)
+          return string.dup.force_encoding(Encoding::UTF_8)
+        elsif transcodable?(string)
           # If the string is not currently valid UTF-8 but it can be transcoded,
           # we can guess this string was not originally unicode. We need it to
           # be now, so transcode it to UTF-8. For strings with original
           # encodings like SHIFT_JIS, this should be the final result.
-          value_to_encode.encode!(Encoding::UTF_8)
+          return string.encode(Encoding::UTF_8)
         else
           # If the string is neither valid UTF-8 as-is nor is transcodable, fail
           # at this point. It requires user remediation.
@@ -69,8 +67,6 @@ module Puppet::Util::CharacterEncoding
         raise Puppet::Error.new(_("%{inspect}: %{value} is not valid UTF-8 and cannot be transcoded by Puppet.") %
           { inspect: detail.inspect, value: value_to_encode.dump }, detail)
       end
-
-      return value_to_encode
     end
 
     private
