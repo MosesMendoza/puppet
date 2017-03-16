@@ -4,10 +4,19 @@ require 'puppet/util/character_encoding'
 
 describe Puppet::Util::CharacterEncoding do
   describe "::convert_to_utf_8" do
-    context "when passed a UTF-8 string" do
-      it "should return the string unaltered" do
-        utf8_string = "\u06FF\u2603"
-        expect(Puppet::Util::CharacterEncoding.convert_to_utf_8(utf8_string)).to eq(utf8_string)
+    context "when passed a string that is already UTF-8" do
+      context "with valid encoding" do
+        it "should return the string unaltered" do
+          utf8_string = "\u06FF\u2603"
+          expect(Puppet::Util::CharacterEncoding.convert_to_utf_8(utf8_string)).to eq(utf8_string)
+        end
+      end
+
+      context "with invalid encoding" do
+        it "should raise an error" do
+          invalid_utf8_string = "\xfd\xf1".force_encoding(Encoding::UTF_8)
+          expect { Puppet::Util::CharacterEncoding.convert_to_utf_8(invalid_utf8_string) }.to raise_error(Puppet::Error, /not valid UTF-8/)
+        end
       end
     end
 

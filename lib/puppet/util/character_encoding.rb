@@ -12,10 +12,16 @@ module Puppet::Util::CharacterEncoding
     # @raise [Puppet::Error] a failure to legitimately set external encoding or
     #   transcode string
     def convert_to_utf_8(string)
-      return string if string.encoding == Encoding::UTF_8
+      return string if (string.encoding == Encoding::UTF_8 && string.valid_encoding?)
 
       begin
-        if valid_utf_8?(string)
+        if already_invalid_utf_8?(string)
+          # If a string is currently believed to be UTF-8, but is also not
+          # valid_encoding?, we have no recourse but to fail because we have no
+          # idea what encoding this string originally came from where it *was*
+          # valid - all we know is it's not currently valid UTF-8.
+          raise EncodingError
+        elsif valid_utf_8?(string)
           # Before we try to transcode the string, check if it is valid UTF-8 as
           # currently constitued (in its non-UTF-8 encoding), and if it is, limit
           # ourselves to setting the external encoding of the string to UTF-8
@@ -64,8 +70,8 @@ module Puppet::Util::CharacterEncoding
         # catch both our own self-determined failure to transcode as well as any
         # error on ruby's part, ie Encoding::InvalidByteSequenceError or
         # Encoding::UndefinedConversionError.
-        raise Puppet::Error.new(_("%{inspect}: %{value} is not valid UTF-8 and cannot be transcoded by Puppet.") %
-          { inspect: detail.inspect, value: value_to_encode.dump }, detail)
+        raise Puppet::Error.new(_("%{error}: %{value} is not valid UTF-8 and cannot be transcoded by Puppet.") %
+          { error: detail.inspect, value: string.dump }, detail)
       end
     end
 
@@ -87,6 +93,14 @@ module Puppet::Util::CharacterEncoding
     # @return [Boolean] whether we think the string can be transcoded
     def transcodable?(string)
       string.valid_encoding?
+    end
+
+    # @api private
+    # @param [String] string a string to test
+    # @return [Boolean] whether the string is both currently believed to be
+    #   UTF-8 and has invalid encoding in UTF-8
+    def already_invalid_utf_8?(string)
+      string.encoding == Encoding::UTF_8 && !string.valid_encoding?
     end
   end
 end
