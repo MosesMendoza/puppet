@@ -124,7 +124,7 @@ module Puppet::Etc
           rescue Puppet::Error
             # struct[index] unmodified
           end
-        elsif value.is_a?(Array) && value.all? { |elem| elem.is_a?(String) }
+        elsif value.is_a?(Array)
           struct[index] = convert_array_values_to_utf8!(value)
         end
       end
