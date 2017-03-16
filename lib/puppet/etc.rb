@@ -18,7 +18,8 @@ module Puppet::Etc
     # On first call opens /etc/group and returns parse of first entry. Each subsquent call
     # returns new struct the next entry or nil if EOF. Call ::endgrent to close file.
     def getgrent
-      if group_entry = ::Etc.getgrent
+      group_entry = ::Etc.getgrent
+      if !group_entry.nil?
         convert_field_values_to_utf8!(group_entry)
       end
       group_entry
@@ -38,7 +39,8 @@ module Puppet::Etc
     # On first call opens /etc/passwd and returns parse of first entry. Each subsquent call
     # returns new struct for the next entry or nil if EOF. Call ::endgrent to close file.
     def getpwent
-      if user_entry = ::Etc.getpwent
+      user_entry = ::Etc.getpwent
+      if !user_entry.nil?
         convert_field_values_to_utf8!(user_entry)
       end
       user_entry
@@ -59,7 +61,8 @@ module Puppet::Etc
     # returns an Etc::Passwd struct corresponding to the entry or raises
     # ArgumentError if none
     def getpwnam(username)
-      if user_entry = ::Etc.getpwnam(username)
+      user_entry = ::Etc.getpwnam(username)
+      if !user_entry.nil?
         convert_field_values_to_utf8!(user_entry)
       end
       user_entry
@@ -69,7 +72,8 @@ module Puppet::Etc
     # returns an Etc::Group struct corresponding to the entry or raises
     # ArgumentError if none
     def getgrnam(groupname)
-      if group_entry = ::Etc.getgrnam(groupname)
+      group_entry = ::Etc.getgrnam(groupname)
+      if !group_entry.nil?
         convert_field_values_to_utf8!(group_entry)
       end
       group_entry
@@ -79,7 +83,8 @@ module Puppet::Etc
     # returns an Etc::Group struct corresponding to the entry or raises
     # ArgumentError if none
     def getgrgid(id)
-      if group_entry = ::Etc.getgrgid(id)
+      group_entry = ::Etc.getgrgid(id)
+      if !group_entry.nil?
         convert_field_values_to_utf8!(group_entry)
       end
       group_entry
@@ -89,7 +94,8 @@ module Puppet::Etc
     # returns an Etc::Passwd struct corresponding to the entry or raises
     # ArgumentError if none
     def getpwuid(id)
-      if user_entry = ::Etc.getpwuid(id)
+      user_entry = ::Etc.getpwuid(id)
+      if !user_entry.nil?
         convert_field_values_to_utf8!(user_entry)
       end
       user_entry
