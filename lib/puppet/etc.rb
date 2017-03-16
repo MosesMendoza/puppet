@@ -120,7 +120,7 @@ module Puppet::Etc
       struct.each_with_index do |value, index|
         if value.is_a?(String)
           begin
-            struct[index] = Puppet::Util::CharacterEncoding.convert_to_utf_8(value)
+            struct[index] = Puppet::Util::CharacterEncoding.convert_to_utf_8!(value)
           rescue Puppet::Error
             # struct[index] unmodified
           end
@@ -141,7 +141,7 @@ module Puppet::Etc
     def convert_array_values_to_utf8!(string_array)
       string_array.map! do |elem|
         begin
-          Puppet::Util::CharacterEncoding.convert_to_utf_8(elem)
+          Puppet::Util::CharacterEncoding.convert_to_utf_8!(elem)
         rescue Puppet::Error
           elem # individual array element unmodified
         end

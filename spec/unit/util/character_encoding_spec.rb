@@ -3,19 +3,19 @@ require 'spec_helper'
 require 'puppet/util/character_encoding'
 
 describe Puppet::Util::CharacterEncoding do
-  describe "::convert_to_utf_8" do
+  describe "::convert_to_utf_8!" do
     context "when passed a string that is already UTF-8" do
       context "with valid encoding" do
         it "should return the string unaltered" do
           utf8_string = "\u06FF\u2603"
-          expect(Puppet::Util::CharacterEncoding.convert_to_utf_8(utf8_string)).to eq(utf8_string)
+          expect(Puppet::Util::CharacterEncoding.convert_to_utf_8!(utf8_string)).to eq(utf8_string)
         end
       end
 
       context "with invalid encoding" do
         it "should raise an error" do
           invalid_utf8_string = "\xfd\xf1".force_encoding(Encoding::UTF_8)
-          expect { Puppet::Util::CharacterEncoding.convert_to_utf_8(invalid_utf8_string) }.to raise_error(Puppet::Error, /not valid UTF-8/)
+          expect { Puppet::Util::CharacterEncoding.convert_to_utf_8!(invalid_utf8_string) }.to raise_error(Puppet::Error, /not valid UTF-8/)
         end
       end
     end
@@ -25,7 +25,7 @@ describe Puppet::Util::CharacterEncoding do
         # I think this effectively what the ruby Etc module is doing when it
         # returns strings read in from /etc/passwd and /etc/group
         let(:iso_8859_1_string) { [225, 154, 160].pack('C*').force_encoding(Encoding::ISO_8859_1) }
-        let(:result) { Puppet::Util::CharacterEncoding.convert_to_utf_8(iso_8859_1_string) }
+        let(:result) { Puppet::Util::CharacterEncoding.convert_to_utf_8!(iso_8859_1_string) }
 
         it "should set external encoding to UTF-8" do
           expect(result.encoding).to eq(Encoding::UTF_8)
@@ -49,7 +49,7 @@ describe Puppet::Util::CharacterEncoding do
           # this is not valid UTF-8
           expect(as_shift_jis.dup.force_encoding(Encoding::UTF_8).valid_encoding?).to be_falsey
 
-          result = Puppet::Util::CharacterEncoding.convert_to_utf_8(as_shift_jis)
+          result = Puppet::Util::CharacterEncoding.convert_to_utf_8!(as_shift_jis)
           expect(result).to eq(as_utf8)
           # largely redundant but reinforces the point - this was transcoded:
           expect(result.bytes.to_a).to eq([227, 129, 144])
@@ -67,7 +67,7 @@ describe Puppet::Util::CharacterEncoding do
           # escape sequences in that encoding. It is also not valid unicode
           # as-is. This scenario is one we can't recover from, so fail.
           as_ascii = [254, 241].pack('C*').force_encoding(Encoding::ASCII)
-          expect { Puppet::Util::CharacterEncoding.convert_to_utf_8(as_ascii) }.to raise_error(Puppet::Error, /not valid UTF-8/)
+          expect { Puppet::Util::CharacterEncoding.convert_to_utf_8!(as_ascii) }.to raise_error(Puppet::Error, /not valid UTF-8/)
         end
       end
     end

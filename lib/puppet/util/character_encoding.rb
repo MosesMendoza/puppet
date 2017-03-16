@@ -2,14 +2,15 @@
 
 module Puppet::Util::CharacterEncoding
   class << self
+    # Warning! This is a destructive method - the string supplied is modified!
     # @api public
     # @param [String] string a string to transcode / force_encode to utf-8
     # @return [String] string if already utf-8, OR
-    #   a copy of string with external encoding set to utf-8 if bytes are valid utf-8 OR
-    #   a copy of string transcoded to utf-8
+    #   a the same string with external encoding set to utf-8 if bytes are valid utf-8 OR
+    #   a the same string transcoded to utf-8
     # @raise [Puppet::Error] a failure to legitimately set external encoding or
     #   transcode string
-    def convert_to_utf_8(string)
+    def convert_to_utf_8!(string)
       return string if (string.encoding == Encoding::UTF_8 && string.valid_encoding?)
 
       begin
@@ -52,13 +53,13 @@ module Puppet::Util::CharacterEncoding
           # UTF-8. We can only guess, so if the string is valid UTF-8 as
           # currently constituted, we default to assuming the string originated
           # in UTF-8 and do not transcode it - we only set external encoding.
-          return string.dup.force_encoding(Encoding::UTF_8)
+          return string.force_encoding(Encoding::UTF_8)
         elsif transcodable?(string)
           # If the string is not currently valid UTF-8 but it can be transcoded,
           # we can guess this string was not originally unicode. We need it to
           # be now, so transcode it to UTF-8. For strings with original
           # encodings like SHIFT_JIS, this should be the final result.
-          return string.encode(Encoding::UTF_8)
+          return string.encode!(Encoding::UTF_8)
         else
           # If the string is neither valid UTF-8 as-is nor is transcodable, fail
           # at this point. It requires user remediation.
@@ -75,13 +76,16 @@ module Puppet::Util::CharacterEncoding
 
     private
 
-    # Do our best to determine if a string is valid
-    # UTF-8 via String#valid_encoding?
+    # Do our best to determine if a string is valid UTF-8 via String#valid_encoding? without permanently
+    # modifying or duplicating the string due to performance concerns
     # @api private
     # @param [String] string a string to test
     # @return [Boolean] whether we think the string is UTF-8 or not
     def valid_utf_8?(string)
-      string.dup.force_encoding(Encoding::UTF_8).valid_encoding?
+      original_encoding = string.encoding
+      valid = string.force_encoding(Encoding::UTF_8).valid_encoding?
+      string.force_encoding(original_encoding)
+      valid
     end
 
     # Trying to encode! a string with existing invalid byte sequences raises
