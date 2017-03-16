@@ -2,8 +2,6 @@
 
 module Puppet::Util::CharacterEncoding
   class << self
-    #TODO make encoding warnings a category/silenceable#.
-
     # @api public
     # @param [String] string a string to transcode / force_encode to utf-8
     # @return [String] string if already utf-8, OR
