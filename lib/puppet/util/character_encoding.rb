@@ -5,7 +5,7 @@ module Puppet::Util::CharacterEncoding
     # Warning! This is a destructive method - the string supplied is modified!
     # @api public
     # @param [String] string a string to transcode / force_encode to utf-8
-    # @return [String] string if already utf-8, OR
+    # @return [String, nil] string if already utf-8, OR
     #   the same string with external encoding set to utf-8 if bytes are valid utf-8 OR
     #   the same string transcoded to utf-8 OR
     #   nil upon a failure to legitimately set external encoding or transcode string
