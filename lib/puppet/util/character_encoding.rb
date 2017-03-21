@@ -11,6 +11,7 @@ module Puppet::Util::CharacterEncoding
     #   nil upon a failure to legitimately set external encoding or transcode string
     def convert_to_utf_8!(string)
       currently_valid = string.valid_encoding?
+      failed_to_convert = false
 
       begin
         if string.encoding == Encoding::UTF_8
@@ -21,7 +22,7 @@ module Puppet::Util::CharacterEncoding
             # valid_encoding?, we have no recourse but to fail because we have no
             # idea what encoding this string originally came from where it *was*
             # valid - all we know is it's not currently valid UTF-8.
-            raise EncodingError
+            failed_to_convert = true
           end
         elsif valid_utf_8_bytes?(string)
           # Before we try to transcode the string, check if it is valid UTF-8 as
@@ -66,14 +67,17 @@ module Puppet::Util::CharacterEncoding
         else
           # If the string is neither valid UTF-8 as-is nor valid in its current
           # encoding, fail. It requires user remediation.
-          raise EncodingError
+          failed_to_convert = true
         end
       rescue EncodingError => detail
         # Catch both our own self-determined failure to transcode as well as any
         # error on ruby's part, ie Encoding::UndefinedConversionError on a
         # failure to encode!.
-        Puppet.debug(_("%{error}: %{value} is not valid UTF-8 and cannot be transcoded by Puppet.") %
-          { error: detail.inspect, value: string.dump })
+        failed_to_convert = true
+      end
+
+      if failed_to_convert
+        Puppet.debug(_("%{value} is not valid UTF-8 and cannot be transcoded by Puppet.") % { value: string.dump })
         return nil
       end
     end
