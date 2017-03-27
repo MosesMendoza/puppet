@@ -9,6 +9,16 @@ describe Puppet::Util::Windows::EventLog, :if => Puppet.features.microsoft_windo
   before(:each) { @event_log = Puppet::Util::Windows::EventLog.new }
   after(:each) { @event_log.close }
 
+  describe "class constants" do
+    it "should define NULL_HANDLE as 0" do
+      expect(Puppet::Util::Windows::EventLog::NULL_HANDLE).to eq(0)
+    end
+
+    it "should define WIN32_FALSE as 0" do
+      expect(Puppet::Util::Windows::EventLog::WIN32_FALSE).to eq(0)
+    end
+  end
+
   describe "self.open" do
     it "sets a handle to the event log" do
       default_name = Puppet::Util::Windows::String.wide_string('Puppet')
@@ -20,7 +30,7 @@ describe Puppet::Util::Windows::EventLog, :if => Puppet.features.microsoft_windo
     it "raises an exception if the event log handle is not opened" do
       # RegisterEventSourceW will return NULL on failure
       # Stubbing prevents leaking eventlog handle
-      Puppet::Util::Windows::EventLog.any_instance.stubs(:RegisterEventSourceW).returns(FFI::Pointer::NULL_HANDLE)
+      Puppet::Util::Windows::EventLog.any_instance.stubs(:RegisterEventSourceW).returns(Puppet::Util::Windows::EventLog::NULL_HANDLE)
       expect { Puppet::Util::Windows::EventLog.open('foo') }.to raise_error(Puppet::Util::Windows::Error, /failed to open Windows eventlog/)
     end
   end
@@ -39,7 +49,7 @@ describe Puppet::Util::Windows::EventLog, :if => Puppet.features.microsoft_windo
       Puppet::Util::Windows::EventLog.any_instance.stubs(:RegisterEventSourceW).returns(:foo)
       event_log = Puppet::Util::Windows::EventLog.new
       # DeregisterEventResource returns 0 on failure, which is mapped to WIN32_FALSE
-      event_log.stubs(:DeregisterEventSource).returns(FFI::WIN32_FALSE)
+      event_log.stubs(:DeregisterEventSource).returns(Puppet::Util::Windows::EventLog::WIN32_FALSE)
       expect { event_log.close }.to raise_error(Puppet::Util::Windows::Error, /failed to close Windows eventlog/)
     end
   end
@@ -51,7 +61,7 @@ describe Puppet::Util::Windows::EventLog, :if => Puppet.features.microsoft_windo
 
     it "raises an exception if the event report fails" do
       # ReportEventW returns 0 on failure, which is mapped to WIN32_FALSE
-      @event_log.stubs(:ReportEventW).returns(FFI::WIN32_FALSE)
+      @event_log.stubs(:ReportEventW).returns(Puppet::Util::Windows::EventLog::WIN32_FALSE)
       expect { @event_log.report_event(:data => 'foo', :event_type => Puppet::Util::Windows::EventLog::EVENTLOG_ERROR_TYPE, :event_id => 0x03) }.to raise_error(Puppet::Util::Windows::Error, /failed to report event/)
     end
 

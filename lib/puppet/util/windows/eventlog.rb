@@ -18,6 +18,12 @@ class Puppet::Util::Windows::EventLog
   EVENTLOG_WARNING_TYPE     = 0x0002
   EVENTLOG_INFORMATION_TYPE = 0x0004
 
+  # These are duplicate definitions from Puppet::Util::Windows::ApiTypes,
+  # established here so this class can be standalone from Puppet, and public so
+  # we can reference them in tests.
+  NULL_HANDLE = 0
+  WIN32_FALSE = 0
+
   # Register an event log handle for the application
   # @param source_name [String] the name of the event source to retrieve a handle for
   # @return [void]
@@ -96,8 +102,6 @@ class Puppet::Util::Windows::EventLog
   private
   # For the purposes of allowing this class to be standalone, the following are
   # duplicate definitions from elsewhere in Puppet:
-  NULL_HANDLE = 0
-  WIN32_FALSE = 0
 
   # If we're loaded via Puppet we should keep the previous behavior of raising
   # Puppet::Util::Windows::Error on errors. For daemon.rb we don't have
