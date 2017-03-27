@@ -23,7 +23,7 @@ class Puppet::Util::Windows::EventLog
   # @return [void]
   # @api public
   def initialize(source_name = 'Puppet')
-    @eventlog_handle = RegisterEventSourceW(nil, wide_string(source_name))
+    @eventlog_handle = RegisterEventSourceW(FFI::Pointer::NULL, wide_string(source_name))
     if @eventlog_handle == NULL_HANDLE
       raise EventlogError.new("failed to open Windows eventlog")
     end
@@ -55,7 +55,8 @@ class Puppet::Util::Windows::EventLog
     from_string_to_wide_string(args[:data]) do |message_ptr|
       FFI::MemoryPointer.new(:pointer, 2) do |message|
         message[0].write_pointer(message_ptr)
-        user_sid, raw_data = nil
+        user_sid = FFI::Pointer::NULL
+        raw_data = FFI::Pointer::NULL
         raw_data_size = 0
         num_strings = 1
         eventlog_category = 0
