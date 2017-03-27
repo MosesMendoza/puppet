@@ -43,15 +43,6 @@ describe Puppet::Util::Windows::EventLog, :if => Puppet.features.microsoft_windo
       event_log.expects(:DeregisterEventSource).with(@handle).returns(1)
       event_log.close
     end
-
-    it "raises an exception if the event log handle fails to close" do
-      # return a bogus handle to prevent leaking handles to event log
-      Puppet::Util::Windows::EventLog.any_instance.stubs(:RegisterEventSourceW).returns(:foo)
-      event_log = Puppet::Util::Windows::EventLog.new
-      # DeregisterEventResource returns 0 on failure, which is mapped to WIN32_FALSE
-      event_log.stubs(:DeregisterEventSource).returns(Puppet::Util::Windows::EventLog::WIN32_FALSE)
-      expect { event_log.close }.to raise_error(Puppet::Util::Windows::Error, /failed to close Windows eventlog/)
-    end
   end
 
   describe "#report_event" do

@@ -39,10 +39,8 @@ class Puppet::Util::Windows::EventLog
   # @return [void]
   # @api public
   def close
-    result_of_close = DeregisterEventSource(@eventlog_handle)
-    if result_of_close == WIN32_FALSE
-      raise EventlogError.new("failed to close Windows eventlog")
-    end
+    DeregisterEventSource(@eventlog_handle)
+  ensure
     @eventlog_handle = nil
   end
 
