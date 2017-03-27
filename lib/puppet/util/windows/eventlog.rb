@@ -59,8 +59,8 @@ class Puppet::Util::Windows::EventLog
   def report_event(args = {})
     raise ArgumentError, "data must be a string, not #{args[:data].class}" unless args[:data].is_a?(String)
     from_string_to_wide_string(args[:data]) do |message_ptr|
-      FFI::MemoryPointer.new(:pointer, 2) do |message|
-        message[0].write_pointer(message_ptr)
+      FFI::MemoryPointer.new(:pointer) do |message_array_ptr|
+        message_array_ptr[0].write_pointer(message_ptr)
         user_sid = FFI::Pointer::NULL
         raw_data = FFI::Pointer::NULL
         raw_data_size = 0
@@ -68,7 +68,7 @@ class Puppet::Util::Windows::EventLog
         eventlog_category = 0
         report_result = ReportEventW(@eventlog_handle, args[:event_type],
           eventlog_category, args[:event_id], user_sid,
-          num_strings, raw_data_size, message, raw_data)
+          num_strings, raw_data_size, message_array_ptr, raw_data)
 
         if report_result == WIN32_FALSE
           raise EventlogError.new("failed to report event to Windows eventlog")
