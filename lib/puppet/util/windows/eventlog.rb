@@ -60,7 +60,7 @@ class Puppet::Util::Windows::EventLog
     raise ArgumentError, "data must be a string, not #{args[:data].class}" unless args[:data].is_a?(String)
     from_string_to_wide_string(args[:data]) do |message_ptr|
       FFI::MemoryPointer.new(:pointer) do |message_array_ptr|
-        message_array_ptr[0].write_pointer(message_ptr)
+        message_array_ptr.write_pointer(message_ptr)
         user_sid = FFI::Pointer::NULL
         raw_data = FFI::Pointer::NULL
         raw_data_size = 0
