@@ -158,6 +158,7 @@ class Puppet::Util::Windows::EventLog
   # );
   ffi_lib :advapi32
   attach_function :RegisterEventSourceW, [:buffer_in, :buffer_in], :uintptr_t
+  private :RegisterEventSourceW
 
   # https://msdn.microsoft.com/en-us/library/windows/desktop/aa363642(v=vs.85).aspx
   # BOOL DeregisterEventSource(
@@ -165,6 +166,7 @@ class Puppet::Util::Windows::EventLog
   # );
   ffi_lib :advapi32
   attach_function :DeregisterEventSource, [:uintptr_t], :int32
+  private :DeregisterEventSource
 
   # https://msdn.microsoft.com/en-us/library/windows/desktop/aa363679(v=vs.85).aspx
   # BOOL ReportEvent(
@@ -180,4 +182,5 @@ class Puppet::Util::Windows::EventLog
   # );
   ffi_lib :advapi32
   attach_function :ReportEventW, [:uintptr_t, :uint16, :uint16, :uint32, :pointer, :uint16, :uint32, :pointer, :pointer], :int32
+  private :ReportEventW
 end
