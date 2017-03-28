@@ -27,11 +27,12 @@ describe Puppet::Util::Windows::EventLog, :if => Puppet.features.microsoft_windo
       Puppet::Util::Windows::EventLog.new
     end
 
-    it "raises an exception if the event log handle is not opened" do
+    it "raises an exception containing the exit code if the event log handle is not opened" do
       # RegisterEventSourceW will return NULL on failure
       # Stubbing prevents leaking eventlog handle
+      FFI.stubs(:errno).returns(87)
       Puppet::Util::Windows::EventLog.any_instance.stubs(:RegisterEventSourceW).returns(Puppet::Util::Windows::EventLog::NULL_HANDLE)
-      expect { Puppet::Util::Windows::EventLog.open('foo') }.to raise_error(Puppet::Util::Windows::Error, /failed to open Windows eventlog/)
+      expect { Puppet::Util::Windows::EventLog.open('foo') }.to raise_error(Puppet::Util::Windows::EventLog::EventLogError, /failed to open Windows eventlog \(exit code 87\)/)
     end
   end
 
@@ -50,10 +51,11 @@ describe Puppet::Util::Windows::EventLog, :if => Puppet.features.microsoft_windo
       expect { @event_log.report_event(:data => 123, :event_type => nil, :event_id => nil) }.to raise_error(ArgumentError, /data must be a string/)
     end
 
-    it "raises an exception if the event report fails" do
+    it "raises an exception containing the exit code if the event report fails" do
       # ReportEventW returns 0 on failure, which is mapped to WIN32_FALSE
+      FFI.stubs(:errno).returns(1722)
       @event_log.stubs(:ReportEventW).returns(Puppet::Util::Windows::EventLog::WIN32_FALSE)
-      expect { @event_log.report_event(:data => 'foo', :event_type => Puppet::Util::Windows::EventLog::EVENTLOG_ERROR_TYPE, :event_id => 0x03) }.to raise_error(Puppet::Util::Windows::Error, /failed to report event/)
+      expect { @event_log.report_event(:data => 'foo', :event_type => Puppet::Util::Windows::EventLog::EVENTLOG_ERROR_TYPE, :event_id => 0x03) }.to raise_error(Puppet::Util::Windows::EventLog::EventLogError, /failed to report event.*\(exit code 1722\)/)
     end
 
   end

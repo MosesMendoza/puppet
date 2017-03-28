@@ -31,7 +31,7 @@ class Puppet::Util::Windows::EventLog
   def initialize(source_name = 'Puppet')
     @eventlog_handle = RegisterEventSourceW(FFI::Pointer::NULL, wide_string(source_name))
     if @eventlog_handle == NULL_HANDLE
-      raise EventlogError.new("failed to open Windows eventlog")
+      raise EventLogError.new("RegisterEventSourceW failed to open Windows eventlog (exit code #{FFI.errno})", FFI.errno)
     end
   end
 
@@ -69,7 +69,7 @@ class Puppet::Util::Windows::EventLog
           num_strings, raw_data_size, message_array_ptr, raw_data)
 
         if report_result == WIN32_FALSE
-          raise EventlogError.new("failed to report event to Windows eventlog")
+          raise EventLogError.new("ReportEventW failed to report event to Windows eventlog (exit code #{FFI.errno})", FFI.errno)
         end
       end
     end
@@ -102,11 +102,13 @@ class Puppet::Util::Windows::EventLog
   # duplicate definitions from elsewhere in Puppet:
 
   # If we're loaded via Puppet we should keep the previous behavior of raising
-  # Puppet::Util::Windows::Error on errors. For daemon.rb we don't have
-  # Puppet::Util::Windows::Error, but daemon.rb just silently blanket rescues
-  # all Exceptions raised during a log attempt, so we're fine just raising a
-  # generic RuntimeError.
-  EventlogError = defined?(Puppet::Util::Windows::Error) ? Puppet::Util::Windows::Error : RuntimeError
+  # Puppet::Util::Windows::Error on errors. If we aren't, at least raise
+  # SystemCallError so we can take advantage of FFI.errno.
+  if defined?(Puppet::Util::Windows::Error)
+    EventLogError = Puppet::Util::Windows::Error
+  else
+    EventLogError = SystemCallError
+  end
 
   # Private duplicate of Puppet::Util::Windows::String::wide_string
   # Not for use outside of EventLog! - use Puppet::Util::Windows instead
