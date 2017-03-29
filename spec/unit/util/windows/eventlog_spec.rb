@@ -27,12 +27,22 @@ describe Puppet::Util::Windows::EventLog, :if => Puppet.features.microsoft_windo
       Puppet::Util::Windows::EventLog.new
     end
 
-    it "raises an exception containing the exit code if the event log handle is not opened" do
+    it "raises an exception warning that the event log failed to open" do
       # RegisterEventSourceW will return NULL on failure
       # Stubbing prevents leaking eventlog handle
+      Puppet::Util::Windows::EventLog.any_instance.stubs(:RegisterEventSourceW).returns(Puppet::Util::Windows::EventLog::NULL_HANDLE)
+      expect { Puppet::Util::Windows::EventLog.open('foo') }.to raise_error(Puppet::Util::Windows::EventLog::EventLogError, /failed to open Windows eventlog/)
+    end
+
+    it "passes the exit code to the exception constructor" do
+      fake_error = Puppet::Util::Windows::EventLog::EventLogError.new('foo', 87)
       FFI.stubs(:errno).returns(87)
       Puppet::Util::Windows::EventLog.any_instance.stubs(:RegisterEventSourceW).returns(Puppet::Util::Windows::EventLog::NULL_HANDLE)
-      expect { Puppet::Util::Windows::EventLog.open('foo') }.to raise_error(Puppet::Util::Windows::EventLog::EventLogError, /failed to open Windows eventlog \(exit code 87\)/)
+      # All we're testing here is that the constructor actually receives the exit code from FFI.errno (87)
+      # We do so because `expect to...raise_error` doesn't support multiple parameter match arguments
+      # We return fake_error just because `raise` expects an exception class
+      Puppet::Util::Windows::EventLog::EventLogError.expects(:new).with(regexp_matches(/failed to open Windows eventlog/), 87).returns(fake_error)
+      expect { Puppet::Util::Windows::EventLog.open('foo') }.to raise_error(Puppet::Util::Windows::EventLog::EventLogError)
     end
   end
 
@@ -51,13 +61,26 @@ describe Puppet::Util::Windows::EventLog, :if => Puppet.features.microsoft_windo
       expect { @event_log.report_event(:data => 123, :event_type => nil, :event_id => nil) }.to raise_error(ArgumentError, /data must be a string/)
     end
 
-    it "raises an exception containing the exit code if the event report fails" do
-      # ReportEventW returns 0 on failure, which is mapped to WIN32_FALSE
-      FFI.stubs(:errno).returns(1722)
-      @event_log.stubs(:ReportEventW).returns(Puppet::Util::Windows::EventLog::WIN32_FALSE)
-      expect { @event_log.report_event(:data => 'foo', :event_type => Puppet::Util::Windows::EventLog::EVENTLOG_ERROR_TYPE, :event_id => 0x03) }.to raise_error(Puppet::Util::Windows::EventLog::EventLogError, /failed to report event.*\(exit code 1722\)/)
-    end
+    context "when an event report fails" do
+      before do
+        # ReportEventW returns 0 on failure, which is mapped to WIN32_FALSE
+        @event_log.stubs(:ReportEventW).returns(Puppet::Util::Windows::EventLog::WIN32_FALSE)
+      end
 
+      it "raises an exception warning that the event report failed" do
+        expect { @event_log.report_event(:data => 'foo', :event_type => Puppet::Util::Windows::EventLog::EVENTLOG_ERROR_TYPE, :event_id => 0x03) }.to raise_error(Puppet::Util::Windows::EventLog::EventLogError, /failed to report event/)
+      end
+
+      it "passes the exit code to the exception constructor" do
+        fake_error = Puppet::Util::Windows::EventLog::EventLogError.new('foo', 5)
+        FFI.stubs(:errno).returns(5)
+        # All we're testing here is that the constructor actually receives the exit code from FFI.errno (5)
+        # We do so because `expect to...raise_error` doesn't support multiple parameter match arguments
+        # We return fake_error just because `raise` expects an exception class
+        Puppet::Util::Windows::EventLog::EventLogError.expects(:new).with(regexp_matches(/failed to report event/), 5).returns(fake_error)
+        expect { @event_log.report_event(:data => 'foo', :event_type => Puppet::Util::Windows::EventLog::EVENTLOG_ERROR_TYPE, :event_id => 0x03) }.to raise_error(Puppet::Util::Windows::EventLog::EventLogError)
+      end
+    end
   end
 
   describe "self.to_native" do

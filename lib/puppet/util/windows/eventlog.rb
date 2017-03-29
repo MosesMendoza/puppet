@@ -31,7 +31,7 @@ class Puppet::Util::Windows::EventLog
   def initialize(source_name = 'Puppet')
     @eventlog_handle = RegisterEventSourceW(FFI::Pointer::NULL, wide_string(source_name))
     if @eventlog_handle == NULL_HANDLE
-      raise EventLogError.new("RegisterEventSourceW failed to open Windows eventlog (exit code #{FFI.errno})", FFI.errno)
+      raise EventLogError.new("RegisterEventSourceW failed to open Windows eventlog", FFI.errno)
     end
   end
 
@@ -69,7 +69,7 @@ class Puppet::Util::Windows::EventLog
           num_strings, raw_data_size, message_array_ptr, raw_data)
 
         if report_result == WIN32_FALSE
-          raise EventLogError.new("ReportEventW failed to report event to Windows eventlog (exit code #{FFI.errno})", FFI.errno)
+          raise EventLogError.new("ReportEventW failed to report event to Windows eventlog", FFI.errno)
         end
       end
     end
@@ -105,9 +105,13 @@ class Puppet::Util::Windows::EventLog
   # Puppet::Util::Windows::Error on errors. If we aren't, at least raise
   # SystemCallError so we can take advantage of FFI.errno.
   if defined?(Puppet::Util::Windows::Error)
-    EventLogError = Puppet::Util::Windows::Error
+    class EventLogError < Puppet::Util::Windows::Error ; end
   else
-    EventLogError = SystemCallError
+    class EventLogError < RuntimeError
+      def initialize(msg, code)
+        super(msg + "(Win32 error: #{code})")
+      end
+    end
   end
 
   # Private duplicate of Puppet::Util::Windows::String::wide_string
