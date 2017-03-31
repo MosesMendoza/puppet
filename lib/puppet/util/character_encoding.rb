@@ -62,6 +62,12 @@ module Puppet::Util::CharacterEncoding
           # (it is valid in its current encoding), we can guess this string was
           # not originally unicode. Transcode it to UTF-8. For strings with
           # original encodings like SHIFT_JIS, this should be the final result.
+          # If the string comes to us as BINARY encoded, we don't know what it
+          # started as. However, to encode! we need a starting place, and our
+          # best guess (only guess) is whatever the system currently is
+          # (default_external). So set external_encoding to default_external
+          # before we try to transcode to UTF-8.
+          string.force_encoding(Encoding.default_external) if string.encoding == Encoding::BINARY
           return string.encode!(Encoding::UTF_8)
         else
           # If the string is neither valid UTF-8 as-is nor valid in its current

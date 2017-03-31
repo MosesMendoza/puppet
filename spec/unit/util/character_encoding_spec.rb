@@ -43,6 +43,26 @@ describe Puppet::Util::CharacterEncoding do
       end
 
       context "the bytes of which do not represent valid UTF-8" do
+        it "should be able to convert BINARY via Encoding.default_external" do
+          # そ - HIRAGANA LETTER SO
+          # In Windows_31J: \x82 \xbb - 130 187
+          # In Unicode: \u305d - \xe3 \x81 \x9d - 227 129 157
+
+          # When received as BINARY are not transcodable, but by "guessing"
+          # Encoding.default_external can transcode to UTF-8
+          begin
+            original_default_external = Encoding.default_external
+            Encoding.default_external = Encoding::Windows_31J
+            as_binary_win_31j = [130, 187].pack('C*')
+            result = Puppet::Util::CharacterEncoding.convert_to_utf_8!(as_binary_win_31j)
+          ensure
+            Encoding.default_external = original_default_external
+          end
+
+          expect(result).to eq("\u305d")
+          expect(result.bytes.to_a).to eq([227, 129, 157])
+        end
+
         it "should transcode the string to UTF-8 if it is transcodable" do
           # http://www.fileformat.info/info/unicode/char/3050/index.htm
           # ぐ - HIRAGANA LETTER GU
