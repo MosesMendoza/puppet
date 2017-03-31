@@ -212,6 +212,7 @@ Puppet::Util::Log.newdesttype :array do
 end
 
 Puppet::Util::Log.newdesttype :eventlog do
+  require 'puppet/util/character_encoding'
   # Leaving these in for backwards compatibility - duplicates the same in
   # Puppet::Util::Windows::EventLog
   Puppet::Util::Log::DestEventlog::EVENTLOG_ERROR_TYPE       = 0x0001
@@ -233,10 +234,13 @@ Puppet::Util::Log.newdesttype :eventlog do
   def handle(msg)
     native_type, native_id = to_native(msg.level)
 
+    # Attempt to convert our message to UTF-8
+    # Fall back to the original message on failure
+    message = Puppet::Util::CharacterEncoding.convert_to_utf_8!(msg.to_s) || msg.to_s
     @eventlog.report_event(
       :event_type  => native_type,
       :event_id    => native_id,
-      :data        => (msg.source and msg.source != 'Puppet' ? "#{msg.source}: " : '') + msg.to_s
+      :data        => (msg.source and msg.source != 'Puppet' ? "#{msg.source}: " : '') + message
     )
   end
 

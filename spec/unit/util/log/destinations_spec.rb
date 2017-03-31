@@ -224,4 +224,19 @@ describe ":eventlog", :if => Puppet::Util::Platform.windows? do
   it "logs :err level as an error type event" do
     expects_message_with_type(klass, :err, klass::EVENTLOG_ERROR_TYPE, 0x3)
   end
+
+  it "converts the message to UTF-8 via Puppet::Util::CharacterEncoding#convert_to_utf_8!" do
+    eventlog = stub('eventlog')
+    Puppet::Util::Windows::EventLog.stubs(:open).returns(eventlog)
+    # そ - HIRAGANA LETTER SO
+    # In Windows_31J: \x82 \xbb - 130 187
+    # In Unicode: \u305d - \xe3 \x81 \x9d - 227 129 157
+    win_31j_msg = [130, 187].pack('C*').force_encoding(Encoding::Windows_31J)
+    utf_8_msg = "\u305d"
+
+    log = Puppet::Util::Log.new(:level => :debug, :message => win_31j_msg, :source => 'Puppet')
+    eventlog.expects(:report_event).with(has_entries(:event_type => klass::EVENTLOG_INFORMATION_TYPE, :event_id => 0x1, :data => "#{utf_8_msg}"))
+    dest = klass.new
+    dest.handle(log)
+  end
 end
