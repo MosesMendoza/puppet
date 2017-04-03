@@ -11,9 +11,10 @@ module Puppet::Util::CharacterEncoding
     #   nil upon a failure to legitimately set external encoding or transcode string
     def convert_to_utf_8!(string)
       currently_valid = string.valid_encoding?
+      original_encoding = string.encoding
 
       begin
-        if string.encoding == Encoding::UTF_8
+        if original_encoding == Encoding::UTF_8
           if currently_valid
             return string
           else
@@ -66,8 +67,13 @@ module Puppet::Util::CharacterEncoding
           # started as. However, to encode! we need a starting place, and our
           # best guess (only guess) is whatever the system currently is
           # (default_external). So set external_encoding to default_external
-          # before we try to transcode to UTF-8.
-          string.force_encoding(Encoding.default_external) if string.encoding == Encoding::BINARY
+          # before we try to transcode to UTF-8. There's one exception, which is
+          # if external encoding is currently UTF-8. We don't bother
+          # force_encoding to UTF-8 first because: a) once we do, ruby won't
+          # transcode it for us to UTF-8 anymore and b) we've already previously
+          # determined that this string is not valid UTF-8 bytes so force
+          # encoding to UTF-8 isn't going to help us
+          string.force_encoding(Encoding.default_external) if string.encoding == Encoding::BINARY && Encoding.default_external != Encoding::UTF_8
           return string.encode!(Encoding::UTF_8)
         else
           # If the string is neither valid UTF-8 as-is nor valid in its current
@@ -75,6 +81,9 @@ module Puppet::Util::CharacterEncoding
           raise EncodingError
         end
       rescue EncodingError => detail
+        # Ensure the string retains it original external encoding since
+        # we've failed
+        string.force_encoding(original_encoding)
         # Catch both our own self-determined failure to transcode as well as any
         # error on ruby's part, ie Encoding::UndefinedConversionError on a
         # failure to encode!.

@@ -43,42 +43,54 @@ describe Puppet::Util::CharacterEncoding do
       end
 
       context "the bytes of which do not represent valid UTF-8" do
-        it "should be able to convert BINARY via Encoding.default_external" do
-          # そ - HIRAGANA LETTER SO
-          # In Windows_31J: \x82 \xbb - 130 187
-          # In Unicode: \u305d - \xe3 \x81 \x9d - 227 129 157
+        original_default_external = Encoding.default_external
 
-          # When received as BINARY are not transcodable, but by "guessing"
-          # Encoding.default_external can transcode to UTF-8
-          begin
-            original_default_external = Encoding.default_external
-            Encoding.default_external = Encoding::Windows_31J
-            as_binary_win_31j = [130, 187].pack('C*')
-            result = Puppet::Util::CharacterEncoding.convert_to_utf_8!(as_binary_win_31j)
-          ensure
-            Encoding.default_external = original_default_external
-          end
-
-          expect(result).to eq("\u305d")
-          expect(result.bytes.to_a).to eq([227, 129, 157])
+        after (:each) do
+          Encoding.default_external = original_default_external
         end
 
-        it "should transcode the string to UTF-8 if it is transcodable" do
-          # http://www.fileformat.info/info/unicode/char/3050/index.htm
-          # ぐ - HIRAGANA LETTER GU
-          # In Shift_JIS: \x82 \xae - 130 174
-          # In Unicode: \u3050 - \xe3 \x81 \x90 - 227 129 144
-          # if we were only ruby > 2.3.0, we could do String.new("\x82\xae", :encoding => Encoding::Shift_JIS)
-          as_shift_jis = [130, 174].pack('C*').force_encoding(Encoding::Shift_JIS)
-          as_utf8 = "\u3050"
+        context "when Encoding.default_external is not UTF-8" do
+          before do
+            Encoding.default_external = Encoding::Windows_31J
+          end
 
-          # this is not valid UTF-8
-          expect(as_shift_jis.dup.force_encoding(Encoding::UTF_8).valid_encoding?).to be_falsey
+          it "should be able to convert BINARY via Encoding.default_external" do
+            # そ - HIRAGANA LETTER SO
+            # In Windows_31J: \x82 \xbb - 130 187
+            # In Unicode: \u305d - \xe3 \x81 \x9d - 227 129 157
 
-          result = Puppet::Util::CharacterEncoding.convert_to_utf_8!(as_shift_jis)
-          expect(result).to eq(as_utf8)
-          # largely redundant but reinforces the point - this was transcoded:
-          expect(result.bytes.to_a).to eq([227, 129, 144])
+            # When received as BINARY are not transcodable, but by "guessing"
+            # Encoding.default_external can transcode to UTF-8
+            as_binary_win_31j = [130, 187].pack('C*')
+            result = Puppet::Util::CharacterEncoding.convert_to_utf_8!(as_binary_win_31j)
+
+            expect(result).to eq("\u305d")
+            expect(result.bytes.to_a).to eq([227, 129, 157])
+          end
+        end
+
+        context "when Encoding.default_external is UTF-8" do
+          before do
+            Encoding.default_external = Encoding::UTF_8
+          end
+
+          it "should transcode the string to UTF-8 if it is transcodable" do
+            # http://www.fileformat.info/info/unicode/char/3050/index.htm
+            # ぐ - HIRAGANA LETTER GU
+            # In Shift_JIS: \x82 \xae - 130 174
+            # In Unicode: \u3050 - \xe3 \x81 \x90 - 227 129 144
+            # if we were only ruby > 2.3.0, we could do String.new("\x82\xae", :encoding => Encoding::Shift_JIS)
+            as_shift_jis = [130, 174].pack('C*').force_encoding(Encoding::Shift_JIS)
+            as_utf8 = "\u3050"
+
+            # this is not valid UTF-8
+            expect(as_shift_jis.dup.force_encoding(Encoding::UTF_8).valid_encoding?).to be_falsey
+
+            result = Puppet::Util::CharacterEncoding.convert_to_utf_8!(as_shift_jis)
+            expect(result).to eq(as_utf8)
+            # largely redundant but reinforces the point - this was transcoded:
+            expect(result.bytes.to_a).to eq([227, 129, 144])
+          end
         end
 
         context "if it is not transcodable" do
