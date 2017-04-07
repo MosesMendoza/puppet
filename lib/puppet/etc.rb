@@ -77,7 +77,7 @@ module Puppet::Etc
       convert_field_values_to_utf8!(::Etc.getpwuid(id))
     end
 
-    private
+    #private
     # Utility method for converting the String values of a struct returned by
     # the Etc module to UTF-8. Structs returned by the ruby Etc module contain
     # members with fields of type String, Integer, or Array of Strings, so we
@@ -96,10 +96,20 @@ module Puppet::Etc
       return nil if struct.nil?
       struct.each_with_index do |value, index|
         if value.is_a?(String)
-            converted = Puppet::Util::CharacterEncoding.convert_to_utf_8!(value)
-            struct[index] = converted if !converted.nil?
+            # If a string is generated in BINARY it could not be represented in
+            # the current system encoding - a good indication that it doesn't
+            # originate in that encoding. In that case we don't trust it and
+            # choose to "override" to UTF-8.
+            if value.encoding == Encoding::BINARY
+              Puppet::Util::CharacterEncoding.override_encoding_to_utf_8!(value)
+            else
+              # If a string is not in BINARY, it is more likely that it
+              # originated in whatever default external is - and thus we should
+              # transcode to it get to UTF-8.
+              Puppet::Util::CharacterEncoding.convert_to_utf_8!(value)
+            end
         elsif value.is_a?(Array)
-          struct[index] = convert_array_values_to_utf8!(value)
+          convert_array_values_to_utf8!(value)
         end
       end
     end
@@ -113,9 +123,17 @@ module Puppet::Etc
     # @return [Array] original Array with String values converted to UTF-8 if
     #   convertible, or original, unmodified values if not.
     def convert_array_values_to_utf8!(string_array)
-      string_array.map! do |elem|
-        converted = Puppet::Util::CharacterEncoding.convert_to_utf_8!(elem)
-        converted.nil? ? elem : converted
+      string_array.each do |elem|
+        # If a string comes in BINARY its a good indication it does not
+        # match default external encoding
+        if elem.encoding == Encoding::BINARY
+          Puppet::Util::CharacterEncoding.override_encoding_to_utf_8!(elem)
+        else
+          # If a string is not in BINARY, it's more likely to match up with
+          # whatever default external is and we should transcode to get to
+          # UTF-8
+          Puppet::Util::CharacterEncoding.convert_to_utf_8!(elem)
+        end
       end
     end
   end

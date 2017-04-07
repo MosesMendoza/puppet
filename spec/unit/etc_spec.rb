@@ -16,9 +16,11 @@ describe Puppet::Etc, :if => !Puppet.features.microsoft_windows? do
   # http://www.fileformat.info/info/unicode/char/5e0c/index.htm
   # 希 Han Character 'rare; hope, expect, strive for'
   # In EUC_KR: \xfd \xf1 - 253 241
-  # Not convertible to UTF-8 without an intermediate encoding as a hint, likely
-  # to be read in as BINARY by Ruby unless system is in EUC_KR
-  let(:not_convertible) { [253, 241].pack('C*') }
+  # Likely to be read in as BINARY by Ruby unless system encoding is EUC_KR
+  let(:euc_kr) { [253, 241].pack('C*').force_encoding(Encoding::EUC_KR)}
+  let(:euc_kr_as_binary) { [253, 241].pack('C*') }
+  # transcoded to UTF-8: \u5e0c - \xe5 \xb8 \x8c - 229 184 140
+  let(:euc_kr_to_utf_8) { "\u5e0c" }
 
   # characters representing different UTF-8 widths
   # 1-byte A
@@ -26,14 +28,9 @@ describe Puppet::Etc, :if => !Puppet.features.microsoft_windows? do
   # 3-byte ᚠ - http://www.fileformat.info/info/unicode/char/16A0/index.htm - 0xE1 0x9A 0xA0 / 225 154 160
   # 4-byte 𠜎 - http://www.fileformat.info/info/unicode/char/2070E/index.htm - 0xF0 0xA0 0x9C 0x8E / 240 160 156 142
   #
-  # Should all convert cleanly to UTF-8
-  # Unless the system is in UTF-8, these will likely be read in as BINARY by Ruby
-  let(:convertible_utf8) { "A\u06FF\u16A0\u{2070E}" } # Aۿᚠ𠜎
-  let(:convertible_binary) { "A\u06FF\u16A0\u{2070E}".force_encoding(Encoding::BINARY) }
-
-  # For the methods described which actually expect an encoding conversion, we
-  # only superficially test via #force_encoding - the deeper level testing is in
-  # character_encoding_spec.rb which handles testing transcoding etc.
+  # If system encoding is not UTF-8, these will likely be read in as BINARY by Ruby
+  let(:mixed_utf_8) { "A\u06FF\u16A0\u{2070E}".force_encoding(Encoding::UTF_8) } # Aۿᚠ𠜎
+  let(:mixed_utf_8_as_binary) { "A\u06FF\u16A0\u{2070E}".force_encoding(Encoding::BINARY) }
 
   describe "getgrent" do
     context "given an original system Etc Group struct with ISO-8850-1 string values" do
@@ -51,8 +48,12 @@ describe Puppet::Etc, :if => !Puppet.features.microsoft_windows? do
       end
     end
 
-    context "given an original Etc::Group struct with BINARY field values" do
+    context "when Encoding.default_external is UTF-8" do
       original_encoding = Encoding.default_external
+
+      before(:each) do
+        Encoding.default_external = Encoding::UTF_8
+      end
 
       after(:each) do
         Encoding.default_external = original_encoding
@@ -61,75 +62,91 @@ describe Puppet::Etc, :if => !Puppet.features.microsoft_windows? do
       let(:group) { Etc::Group.new }
 
       before do
-        # group membership contains a string with valid UTF-8 bytes in binary
-        # encoding and a string in binary that cannot be converted without an
-        # intermediate non-UTF-8 encoding
-        group.mem = [convertible_binary, not_convertible]
-        # group name contains a binary value that cannot be converted without an
-        # intermediate non-UTF-8 encoding
-        group.name = not_convertible
+        # In a UTF-8 environment, the UTF-8 values will come back as UTF-8,
+        # while the EUC_KR values will come back as binary So to simulate, group
+        # membership contains a string with valid UTF-8 bytes in UTF-8 encoding,
+        # and EUC_KR bytes in binary. We don't have any direction what to do
+        # with bytes that aren't valid UTF-8 when the system is in UTF-8 - so we
+        # leave them alone.
+        group.mem = [mixed_utf_8, euc_kr_as_binary]
+        # group name contains same EUC_KR bytes in binary
+        group.name = euc_kr_as_binary
         # group passwd field is valid UTF-8
-        group.passwd = convertible_binary
+        group.passwd = mixed_utf_8
         Etc.expects(:getgrent).returns(group)
       end
 
-      context "when Encoding.default_external is UTF-8" do
-        before(:each) do
-          Encoding.default_external = Encoding::UTF_8
-        end
+      let(:converted) { Puppet::Etc.getgrent }
 
-        let(:converted) { Puppet::Etc.getgrent }
-
-        it "should convert convertible values in arrays to UTF-8" do
-          expect(converted.mem[0]).to eq("A\u06FF\u16A0\u{2070E}")
-          expect(converted.mem[0].encoding).to eq(Encoding::UTF_8) # just being explicit
-        end
-
-        it "should leave the unconvertible binary values unmodified" do
-          expect(converted.name).to eq([253, 241].pack('C*'))
-          expect(converted.name.encoding).to eq(Encoding::BINARY) # just being explicit
-        end
-
-        it "should leave unconvertible binary values in arrays unmodifed" do
-          expect(converted.mem[1]).to eq([253, 241].pack('C*'))
-          expect(converted.mem[1].encoding).to eq(Encoding::BINARY) # just being explicit
-        end
-
-        it "should convert values that can be converted to UTf-8" do
-          expect(converted.passwd).to eq("A\u06FF\u16A0\u{2070E}")
-          expect(converted.passwd.encoding).to eq(Encoding::UTF_8) # just being explicit
-        end
+      it "should leave the valid UTF-8 in arrays unmodified" do
+        expect(converted.mem[0]).to eq(mixed_utf_8)
+        expect(converted.mem[0].encoding).to eq(Encoding::UTF_8) # just being explicit
       end
 
-      context "when Encoding.default_external is not UTF-8" do
-        before(:each) do
-          Encoding.default_external = Encoding::EUC_KR
-        end
+      it "should leave the valid UTF-8 values unmodified" do
+        expect(converted.passwd).to eq(mixed_utf_8)
+        expect(converted.passwd.encoding).to eq(Encoding::UTF_8) # just being explicit
+      end
 
-        let(:converted) { Puppet::Etc.getgrent }
+      it "should leave the EUC_KR binary-encoded values unmodified" do
+        expect(converted.name).to eq(euc_kr_as_binary)
+        expect(converted.name.encoding).to eq(Encoding::BINARY) # just being explicit
+      end
 
-        # http://www.fileformat.info/info/unicode/char/5e0c/index.htm
-        # 希 Han Character 'rare; hope, expect, strive for'
-        # In EUC_KR: \xfd \xf1 - 253 241
-        # While not convertible to UTF-8 without an intermediate encoding as
-        # a hint, if external encoding is EUC_KR but we receive this in
-        # BINARY we should be able to convert it to UTF-8
-        # In UTF-8: \u5e0c - \xe5 \xb8 \x8c - 229 184 140
-        it "should convert binary values in arrays that can leverage Encoding.default_external for a transcoding hint" do
-          expect(converted.mem[1]).to eq("\u5e0c")
-          expect(converted.mem[1].encoding).to eq(Encoding::UTF_8)
-        end
+      it "should leave EUC_KR binary-encoded values in arrays unmodifed" do
+        expect(converted.mem[1]).to eq(euc_kr_as_binary)
+        expect(converted.mem[1].encoding).to eq(Encoding::BINARY) # just being explicit
+      end
+    end
 
-        it "should convert binary values that can leverage Encoding.default_external for a transcoding hint" do
-          expect(converted.name).to eq("\u5e0c")
-          expect(converted.name.encoding).to eq(Encoding::UTF_8)
-        end
+    context "when Encoding.default_external is NOT UTF-8" do
+      original_encoding = Encoding.default_external
 
-        # Just to confirm our known-good UTF-8 bytes are also converted
-        it "should convert values already representing UTF-8 bytes to UTF-8" do
-          expect(converted.passwd).to eq("A\u06FF\u16A0\u{2070E}")
-          expect(converted.passwd.encoding).to eq(Encoding::UTF_8) # just being explicit
-        end
+      before(:each) do
+        Encoding.default_external = Encoding::EUC_KR
+      end
+
+      after(:each) do
+        Encoding.default_external = original_encoding
+      end
+
+      let(:group) { Etc::Group.new }
+
+      before do
+        # In a non-UTF-8 environment, situation is reversed. The UTF-8 values
+        # will come back as binary while the EUC_KR values will come back as
+        # EUC_KR. So to simulate, group membership contains a string with valid
+        # UTF-8 bytes in binary encoding, and EUC_KR bytes in EUC_KR. In this
+        # case, we would "override" (set external encoding) on the UTF-8 binary
+        # values, and "convert" (transcode) the EUC_KR values.
+        group.mem = [mixed_utf_8_as_binary, euc_kr]
+        # group name contains same EUC_KR bytes
+        group.name = euc_kr
+        # group passwd field is valid UTF-8 as binary
+        group.passwd = mixed_utf_8_as_binary
+        Etc.expects(:getgrent).returns(group)
+      end
+
+      let(:converted) { Puppet::Etc.getgrent }
+
+      it "should override the encoding of valid UTF-8 binary-encoded values in arrays to UTF-8" do
+        expect(converted.mem[0]).to eq(mixed_utf_8)
+        expect(converted.mem[0].encoding).to eq(Encoding::UTF_8) # just being explicit
+      end
+
+      it "should override the encoding of valid UTF-8 binary-encoded values to UTF-8" do
+        expect(converted.passwd).to eq(mixed_utf_8)
+        expect(converted.passwd.encoding).to eq(Encoding::UTF_8) # just being explicit
+      end
+
+      it "should convert the EUC_KR values in arrays to UTF-8" do
+        expect(converted.mem[1]).to eq(euc_kr_to_utf_8)
+        expect(converted.mem[1].encoding).to eq(Encoding::UTF_8)
+      end
+      
+      it "should convert the EUC_KR (non-UTF-8) values to UTF-8" do
+        expect(converted.name).to eq(euc_kr_to_utf_8)
+        expect(converted.name.encoding).to eq(Encoding::UTF_8)
       end
     end
   end
@@ -160,26 +177,27 @@ describe Puppet::Etc, :if => !Puppet.features.microsoft_windows? do
       end
     end
 
-    context "given an original Etc::Passwd struct with field values that cannot be converted to UTF-8" do
+    context "given an original Etc::Passwd struct with a mix of UTF-8 and binary values" do
       let(:user) { Etc::Passwd.new }
       before do
-        # user comment field cannot be converted to UTF-8
-        user.gecos =  not_convertible
+        # user comment field is EUC_KR which would be read in as binary when
+        # external encoding is UTF-8
+        user.gecos =  euc_kr_as_binary
         # user passwd field is valid UTF-8
-        user.passwd = convertible_binary
+        user.passwd = mixed_utf_8
 
         Etc.expects(:getpwent).returns(user)
       end
 
       let(:converted) { Puppet::Etc.getpwent }
 
-      it "should leave the unconvertible values unmodified" do
-        expect(converted.gecos).to eq([253, 241].pack('C*'))
+      it "should leave the binary values unmodified" do
+        expect(converted.gecos).to eq(euc_kr_as_binary)
         expect(converted.gecos.encoding).to eq(Encoding::BINARY) # just being explicit
       end
 
-      it "should convert values that can be converted to UTf-8" do
-        expect(converted.passwd).to eq("A\u06FF\u16A0\u{2070E}")
+      it "should leave the valid UTF-8 values unmodified" do
+        expect(converted.passwd).to eq(mixed_utf_8)
         expect(converted.passwd.encoding).to eq(Encoding::UTF_8) # just being explicit
       end
     end
