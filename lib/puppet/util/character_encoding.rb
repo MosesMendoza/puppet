@@ -70,8 +70,18 @@ module Puppet::Util::CharacterEncoding
       end
     end
 
+    # Given a string, return a copy of that string with any invalid byte
+    # sequences in its current encoding replaced with "?"
+    # @param string a string to remove invalid byte sequences from
+    # @return a copy of string invalid byte sequences replaced by "?" character
+    # @note does not modify encoding, but new string will have different bytes
+    #   from original
+    def scrub(string)
+      if String.method_defined?(:scrub)
+        string.scrub
+      else
+        string.chars.map { |c| c.valid_encoding? ? c : "?"}.join
       end
-      nil
     end
 
     private
