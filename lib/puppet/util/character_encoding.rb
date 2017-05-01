@@ -48,11 +48,10 @@ module Puppet::Util::CharacterEncoding
       return nil
     end
 
-    # Warning! This is a destructive method - the string supplied is modified!
-    # Given a string, tests if that string's bytes represent valid UTF-8, and if
-    # so sets the external encoding of the string to UTF-8. Does not modify the
-    # byte representation of the string. If the string does not represent valid
-    # UTF-8, does not set the external encoding.
+    # Given a string, tests if that string's bytes represent valid UTF-8, and
+    # if so return a copy of the string with external enocding set to UTF-8.
+    # Does not modify the byte representation of the string. If the string does
+    # not represent valid UTF-8, does not set the external encoding.
     #
     # This method is intended for situations where we do not believe that the
     # encoding associated with a string is an accurate reflection of its actual
@@ -60,13 +59,17 @@ module Puppet::Util::CharacterEncoding
     # of the encoding of the string.
     #
     # @api public
-    # @param [String] string set external encoding (re-label) to utf-8
-    # @return [nil] (string is modified in place)
-    def override_encoding_to_utf_8!(string)
+    # @param [String] string to set external encoding (re-label) to utf-8
+    # @return [String] a copy of string with external encoding set to utf-8
+    def override_encoding_to_utf_8(string)
       if valid_utf_8_bytes?(string)
-        string.force_encoding(Encoding::UTF_8)
+        string.dup.force_encoding(Encoding::UTF_8)
       else
         Puppet.debug(_("%{value} is not valid UTF-8 and result of overriding encoding would be invalid.") % { value: string.dump })
+        string
+      end
+    end
+
       end
       nil
     end
