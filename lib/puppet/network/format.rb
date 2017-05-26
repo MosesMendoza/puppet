@@ -5,15 +5,13 @@ require 'puppet/confiner'
 class Puppet::Network::Format
   include Puppet::Confiner
 
-  attr_reader :name, :mime
+  attr_reader :name, :mime, :charset
   attr_accessor :intern_method, :render_method, :intern_multiple_method, :render_multiple_method, :weight, :required_methods, :extension
 
   def init_attribute(name, default)
-    if value = @options[name]
-      @options.delete(name)
-    else
-      value = default
-    end
+    value = @options.delete(name)
+    value = default if value.nil?
+
     self.send(name.to_s + "=", value)
   end
 
@@ -36,6 +34,7 @@ class Puppet::Network::Format
     init_attribute(:weight, 5)
     init_attribute(:required_methods, method_list.keys)
     init_attribute(:extension, name.to_s)
+    init_attribute(:charset, nil)
 
     method_list.each do |method, value|
       init_attribute(method, value)
@@ -60,6 +59,10 @@ class Puppet::Network::Format
 
   def mime=(mime)
     @mime = mime.to_s.downcase
+  end
+
+  def charset=(charset)
+    @charset = charset
   end
 
   def render(instance)
