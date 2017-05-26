@@ -240,8 +240,8 @@ class Puppet::Graph::SimpleGraph
       #TRANSLATORS OmniGraffle and GraphViz and program names and should not be translated
       message += _("Try the '--graph' option and opening the resulting '.dot' file in OmniGraffle or GraphViz")
     end
-
-    raise Puppet::Error, message
+    Puppet.warning(message)
+    cycles
   end
 
   def write_cycles_to_graph(cycles)

@@ -148,6 +148,17 @@ class Puppet::Transaction
       persistence.save if catalog.host_config?
     end
 
+    graph_cycle_handler = lambda do |cycles|
+      cycles.each do |cycle|
+        cycle.each do |resource|
+          resource_status(resource).failed = true
+        end
+      end
+      raise Puppet::Error, 'Cycle detected in graph, failing transaction.'
+    end
+
+
+
     # Generate the relationship graph, set up our generator to use it
     # for eval_generate, then kick off our traversal.
     generator.relationship_graph = relationship_graph
@@ -155,6 +166,7 @@ class Puppet::Transaction
                                 :pre_process => pre_process,
                                 :overly_deferred_resource_handler => overly_deferred_resource_handler,
                                 :canceled_resource_handler => canceled_resource_handler,
+                                :graph_cycle_handler => graph_cycle_handler,
                                 :teardown => teardown) do |resource|
       if resource.is_a?(Puppet::Type::Component)
         Puppet.warning _("Somehow left a component in the relationship graph")
