@@ -98,52 +98,274 @@ class Puppet::Graph::SimpleGraph
   # This method has an unhealthy relationship with the find_cycles_in_graph
   # method below, which contains the knowledge of how the state object is
   # maintained.
+  #
   def tarjan(root, s)
     # initialize the recursion stack we use to work around the nasty lack of a
     # decent Ruby stack.
+
+    # For our purposes, we have two resources in a relationship,
+    
+    # notify { foo: require => Notify[bar] }
+    # notify { bar: }
+
+    # root is a Puppet::Type resource instance, ie #<Puppet::Type::Notify>
+    # s starts as 
+    # s = 
+    #   { 
+    #     :number => 0, # Integer, some sort of global index
+    #     :index => {}, # Hash of resource => Integer, ie { #<Puppet::Type::Notify[bar]> => 0 }
+    #     :lowlink => {}, # Hash of resource => Integer, ie  { #<Puppet::Type::Notify[bar] => 0 }
+    #     :scc => [], # Array 
+    #     :stack => [], # Array of resources, ie [ #<Puppet::Type::Notify[bar]> ]
+    #     :seen => {} # Hash of resource => boolean, ie  { #<Puppet::Type::Notify[bar]> => true }
+    #   }
+
     recur = [{ :node => root }]
 
+    # recur is an array of hashes
+    # starts with first hash containing { :node => #<Puppet::Type::Notify[bar]> }
+    
+    # while our array of hashes containing resources isn't empty
+    # On the first loop run, recur was an array with a single element, a hash with a single key (:node) pointing to value of our puppet resource
+    # All we do the first loop run is populate the state (s) hash with, look for children (dependents of) our puppet resource, and run again
+    # The second loop run, recur still has only element, but (s) and the element hash have been modified. Now, recur looks like this:
+    # recur = [ { 
+    #   :node => Puppet::Type::Notify[bar],
+    #   :children => [ Puppet::Type::Notify[foo], Class[Main] ],
+    #   :step => :children
+    # } ]
     while not recur.empty? do
+      # frame is the last hash in recur array of hashes. when we :push onto an
+      # array, it adds it as the last entry in the array so recur.last is
+      # checking what the last thing we pushed onto the array is
       frame = recur.last
+      
+      # vertex is the Puppet::Type resource in { :node => #<Puppet::Type::Notify[bar]> }
       vertex = frame[:node]
 
+      # Is there a { :step => ... } key in the last hash in the recur array of hashes?
       case frame[:step]
+      
       when nil then
+      # There is no :step key. Happens on:
+      # - the very first loop through, in which case frame is only:
+      #   { :node => #<Puppet::Type::Notify[bar]> }
+      # - the third loop iteration, when our recur array now has two entries, the first for #<Puppet::Type::Notify[bar]>,
+      #   and the second for #<Puppet::Type::Notify[foo]>, it's child. it looks like this:
+      #   recur = [
+      #     { 
+      #       :node => #<Puppet::Type::Notify[bar]>,
+      #       :children => [ #<Class[Main]> ],
+      #       :step => :after_recursion,
+      #       :child => #<Puppet::Type::Notify[foo]>
+      #     },
+      #     { 
+      #       :node => #<Puppet::Type::Notify[foo]
+      #     }
+      # - the fifth time through the loop recur has three entries, which looks like this:
+      #   recur = [
+      #     {
+      #       :node => #<Puppet::Type::Notify[bar]>,
+      #       :children => [ #<Class[Main]> ],
+      #       :step => :after_recursion,
+      #       :child => #<Puppet::Type::Notify[foo]>
+      #     },
+      #     { 
+      #       :node => #<Puppet::Type::Notify[foo]
+      #       :children => []
+      #       :step => :after_recursion,
+      #       :child => #<Class[Main]>
+      #     }
+      #     { 
+      #       :node => #<Class[main]>
+      #     }
+      #   ]
+      # - the seventh time through the loop we look like this:
+      #
+      #   recur = [
+      #     {
+      #       :node => #<Puppet::Type::Notify[bar]>,
+      #       :children => [ #<Class[Main]> ],
+      #       :step => :after_recursion,
+      #       :child => #<Puppet::Type::Notify[foo]>
+      #     },
+      #     { 
+      #       :node => #<Puppet::Type::Notify[foo]
+      #       :children => []
+      #       :step => :after_recursion,
+      #       :child => #<Class[Main]>
+      #     }
+      #     { 
+      #       :node => #<Class[main]>
+      #       :children => []
+      #       :step => :after_recursion,
+      #       :child => #<Stage[Main]>
+      #     }
+      #     {
+      #       :node => #<Stage[Main]>
+      #     }
+      #   ]
+
+        # On the first call to this method, s[:number] is 0 
+        # Set the index for this resource to 0 (hash)
+        # Set the lowlink for this resource to 0 (hash)
+        # Incrememt the number (Integer)
+        # We also get here on the 3rd time through the loop, in
+        # which s[:number] == 1
+        # And on the fifth time, in which:
+        # s[:number] == 2
         s[:index][vertex]   = s[:number]
         s[:lowlink][vertex] = s[:number]
         s[:number]          = s[:number] + 1
 
+
+        # Add the current resource to s[:stack] (array)
+        # Mark the resource has having been 'seen'
         s[:stack].push(vertex)
         s[:seen][vertex] = true
+        # s = { 
+          # :index => { #<Puppet::Type::Notify[bar]> => 0 }
+          # :lowlink => { #<Puppet::Type::Notify[bar]> => 0 }
+          # :number => 1
+          # :stack => [ #<Puppet::Type::Notify[bar]> ]
+          # :seen => { #<Puppet::Type::Notify[bar]> => true }
+        # }
 
+        # Note:
+        # @in_to is dependencies
+        # if foo requires/depends on bar,
+        # foo's dependencies include bar
+        # bar is a direct dependency of foo
+        # foo is a direct dependent of bar
+        # bar's dependents include foo
+        # 
+        # @in_to[foo] is bar
+        # @out_from[bar] is foo
+        # 
+        # On the original last hash in the recur array (recur.last)
+        # set its children to all of the '@out_from' resources in the graph (adjacent[v] with no options returns @out_from[v])
+        # So find all of the dependents of this resource, ie everything that depends on #<Puppet::Type::Notify[bar]>
+        # This includes:
+        # - Puppet::Type::Notify[foo]
+        # - Class[Main]
+        # and set that to the value of :children
         frame[:children] = adjacent(vertex)
         frame[:step]     = :children
 
+        # so now frame ie recur.last goes from:
+        # { :node => #<Puppet::Type::Notify[bar]> }
+        # to
+        # { :node => #<Puppet::Type::Notify[bar]>, 
+        #   :children => [ #<Puppet::Type::Notify[foo]>, Class[Main] ], # array of resources
+        #   :step => :children # symbol
+        # }
+
+        # On the 3rd time through the loop, we'll be here also, and we'll be
+        # looking for children of #<Puppet::Type::Notify[foo]>
+        # It has only one child, #<Whit[Completed_class[Main]]>
+        # but we still loop through again 
+        #
+
       when :children then
+        # The second time through the while loop, we're going to hit this case
+        # entry, and frame (recur.last) looks like this:
+        # { 
+        #   :node => <#Puppet::Type::Notify[bar]>, 
+        #   :children => [ <#Puppet::Type::Notify[foo]>, <#Class[Main]> ], # array of resources
+        #   :step => :children # symbol
+        # }
+        # The fourth time through the loop we're going to be here again,
+        # But this time with:
+        # { 
+        #   :node => #<Puppet::Type::Notify[foo],
+        #   :children => [ #<Whit[Completed_class[Main]]> ],
+        #   :step => :children
+        # }
+        # On the sixth time through the loop, we have:
+        # {
+        #   :node => #<Whit[Completed_class[Main]]>,
+        #   :children => [ #<Whit[Completed_stage[main]]> ],
+        #   :step => :children
+        # }
+        # the 8th time through:
+        # {
+        #   :node => #<Whit[Completed_stage[main]]> ],
+        #   :children => [],
+        #   :step => :children
+        # }
+
         if frame[:children].length > 0 then
+          # child = Take off the first dependent of bar, ie the first resource that depends on bar, which is:
+          #   #<Puppet::Type::Notify[foo]>
+          # Array#shift is destructive, so :children now looks like
+          #   :children => [ <#Class[Main]> ]
           child = frame[:children].shift
+
+          # Does the :index entry of our state hash contain an entry for this resource? Not on this second loop iteration:
+          # s = { 
+          #   :index => {
+          #      #<Puppet::Type::Notify[bar]> => 0
+          #   }
+          # }
           if ! s[:index][child] then
             # Never seen, need to recurse.
             frame[:step] = :after_recursion
             frame[:child] = child
             recur.push({ :node => child })
+            # Now our frame has new entries, and recur has a new key:
+            # recur = [
+            #   { 
+            #     :node => #<Puppet::Type::Notify[bar]>,
+            #     :children => [ #<Class[Main]> ],
+            #     :step => :after_recursion,
+            #     :child => #<Puppet::Type::Notify[foo]>
+            #   },
+            #   { 
+            #     :node => #<Puppet::Type::Notify[foo]
+            #   }
+            # This ends our second while loop iteration, which means we're going to loop again with this recur array
+            # Our frame, ie recur.last, is now going to be { :node => #<Puppet::Type::Notify[foo] }
+            #
+            # On the fourth time through the loop, we're going to add a third entry to recur, for the child of #<Puppet::Type::Notify[foo]>
+            # and loop again 
+            # On the sixth time through the loop we add a fourth entry, for the child of #<Class[Main]>
+            #
           elsif s[:seen][child] then
             s[:lowlink][vertex] = [s[:lowlink][vertex], s[:index][child]].min
           end
         else
+          # On the 8th time through the loop, frame[:children] is empty [],
+          # so we're here. All the elements of s[:lowlink] are the same as s[:index]
+          # vertex is #<Whit[Completed_class[Main]]>
           if s[:lowlink][vertex] == s[:index][vertex] then
             this_scc = []
             begin
+              # first time through, top is Stage[main]
               top = s[:stack].pop
+              # 'Unsee' Stage[main]
               s[:seen][top] = false
+              # add Stage[main] to a temporary array
               this_scc << top
-            end until top == vertex
+            end until top == vertex # Why?
+            # We end the loop here, after a single iteration. At the end of it,
+            # we have this:
+            # s[:stack] == ["Notify[bar]", "Notify[foo]", "Whit[Completed_class[Main]]"] (popped Stage[Main])
+            # And we have 'unseen' Stage[Main]
+
+            # Add the temporary array to s[:scc] so this is an array of arrays
             s[:scc] << this_scc
+            # s[:scc] == [ [ "Whit[Completed_class[Main]]"] ]
           end
+          # And 
           recur.pop               # done with this node, finally.
         end
 
       when :after_recursion then
+        require 'pry';binding.pry if frame[:node].ref == 'Whit[Completed_class[Main]]'
+        
+        # On the 9th time through, we've popped the last recur entry, so we have three entries
+        # currently, frame[:node] == #<Whit[Completed_class[Main]]>
+        
         s[:lowlink][vertex] = [s[:lowlink][vertex], s[:lowlink][frame[:child]]].min
         frame[:step] = :children
 
