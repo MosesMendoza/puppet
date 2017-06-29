@@ -405,6 +405,54 @@ class Puppet::Configurer
 
   private
 
+  # We are only using failover masters if that setting has been populated
+  # @return [Boolean] whether to attempt to fail over puppet masters
+  def using_failover_masters?
+    !Puppet.settings[:server_list].nil? && !Puppet.settings[:server_list].empty?
+  end
+
+  # Parse server_list setting, if set, to obtain a list of servers and server
+  # ports. If not set, use settings for single server. Note: the server_list
+  # setting is munged into an array of arrays - each of the first level arrays
+  # represents a server, port combination, or just server if port is
+  # unspecified. We refine that here to a hash of server/port combinations. If
+  # the port was unspecified in the server_list setting, we use the masterport
+  # setting.
+  # @return [Array[Hash]] array of hashes representing server,port
+  # combinations this agent is configured to talk to.
+  def configured_masters
+    if (Puppet[:server_list].nil? || Puppet[:server_list].empty?)
+      return [ { :host => Puppet[:server], :port  => Puppet[:masterport] } ]
+    else
+      return Puppet[:server_list].map do |entry|
+        {
+          :host => entry[0],
+          :port => entry[1] || Puppet[:masterport]
+        }
+      end
+    end
+  end
+
+  # Issue a Puppet::Node indirection find request for the current agent, and
+  # return the environment name associated with that node as a string
+  # @param host [String] hostname to contact for node request
+  # @param port [String] port on host to contact for node request
+  # @param configured_environment [String] environment name agent is configured with
+  # @return [String] environment name
+  def request_node_from(host, port, configured_environment)
+    # Puppet.override doesn't return the return of its block argument
+    node = nil
+    Puppet.override(:server => host, :serverport => port) do
+      node = Puppet::Node.indirection.find(Puppet[:node_name_value],
+            :environment => Puppet::Node::Environment.remote(@environment),
+            :configured_environment => configured_environment,
+            :ignore_cache => true,
+            :transaction_uuid => @transaction_uuid,
+            :fail_on_404 => true)
+    end
+    node 
+  end
+
   def execute_from_setting(setting)
     return true if (command = Puppet[setting]) == ""
 
