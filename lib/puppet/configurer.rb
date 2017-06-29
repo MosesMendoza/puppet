@@ -194,33 +194,7 @@ class Puppet::Configurer
 
     begin
       Puppet.override(:http_pool => pool) do
-
-        # Skip failover logic if the server_list setting is empty
-        if Puppet.settings[:server_list].nil? || Puppet.settings[:server_list].empty?
-          do_failover = false;
-        else
-          do_failover = true
-        end
-        # When we are passed a catalog, that means we're in apply
-        # mode. We shouldn't try to do any failover in that case.
-        if options[:catalog].nil? && do_failover
-          found = find_functional_server()
-          server = found[:server]
-          if server.nil?
-            Puppet.warning _("Could not select a functional puppet master")
-            server = [nil, nil]
-          end
-          Puppet.override(:server => server[0], :serverport => server[1]) do
-            if !server.first.nil?
-              Puppet.debug "Selected master: #{server[0]}:#{server[1]}"
-              report.master_used = "#{server[0]}:#{server[1]}"
-            end
-
-            run_internal(options.merge(:node => found[:node]))
-          end
-        else
-          run_internal(options)
-        end
+        run_internal(options)
       end
     ensure
       pool.close
@@ -253,21 +227,42 @@ class Puppet::Configurer
     end
 
     begin
-      unless Puppet[:node_name_fact].empty?
-        query_options = get_facts(options)
-      end
-
       configured_environment = Puppet[:environment] if Puppet.settings.set_by_config?(:environment)
 
       # We only need to find out the environment to run in if we don't already have a catalog
-      unless (options[:catalog] || Puppet[:strict_environment_mode])
-        begin
-          if node = options[:node] || Puppet::Node.indirection.find(Puppet[:node_name_value],
-              :environment => Puppet::Node::Environment.remote(@environment),
-              :configured_environment => configured_environment,
-              :ignore_cache => true,
-              :transaction_uuid => @transaction_uuid,
-              :fail_on_404 => true)
+      if !running_via_puppet_apply?
+
+        # If we already have a node object there's no need to search for one
+        unless node = options[:node]
+          # Puppet.override does not return the result of its block, so we track
+          # that explicitly via objects established in this scope
+          result, detail = nil
+          configured_masters.each do |master|
+            begin
+              if options[:node] = request_node_from(master[:host], master[:port], configured_environment)
+                if using_failover_masters?
+                  Puppet.debug(_"Selected master: %{server}:%{port}") % {server: master[:host], port: master[:port]}
+                  report.master_used = "#{server}:#{port}"
+                end
+                Puppet.override(:server => master[:host], :serverport => master[:port]) do
+                  # Re-running in the context of our known-available server, but
+                  # this time we have a node already
+                  result = run_internal(options)
+                end
+                return result
+              end
+            rescue => detail
+            end
+          end
+        end
+
+        # We only switch environments based on the node if strict_environment_mode is not set
+        if !Puppet[:strict_environment_mode]
+          if node.nil?
+            Puppet.warning(_("Could not select a functional puppet master")) if using_failover_masters?
+            Puppet.warning(_("Unable to fetch my node definition, but the agent run will continue:"))
+            Puppet.warning(detail) unless detail.nil? # Conditional is just for testing, when we've stubbed the indirection.
+          else
 
             # If we have deserialized a node from a rest call, we want to set
             # an environment instance as a simple 'remote' environment reference.
@@ -286,10 +281,11 @@ class Puppet::Configurer
               Puppet.info _("Using configured environment '%{env}'") % { env: @environment }
             end
           end
-        rescue StandardError => detail
-          Puppet.warning(_("Unable to fetch my node definition, but the agent run will continue:"))
-          Puppet.warning(detail)
         end
+      end
+
+      unless Puppet[:node_name_fact].empty?
+        query_options = get_facts(options)
       end
 
       current_environment = Puppet.lookup(:current_environment)
@@ -356,35 +352,6 @@ class Puppet::Configurer
     Puppet.pop_context
   end
   private :run_internal
-
-  def find_functional_server()
-    configured_environment = Puppet[:environment] if Puppet.settings.set_by_config?(:environment)
-
-    node = nil
-    selected_server = Puppet.settings[:server_list].find do |server|
-      # Puppet.override doesn't return the result of its block, so we
-      # need to handle this manually
-      found = false
-      server[1] ||= Puppet[:masterport]
-      Puppet.override(:server => server[0], :serverport => server[1]) do
-        begin
-          node = Puppet::Node.indirection.find(Puppet[:node_name_value],
-              :environment => Puppet::Node::Environment.remote(@environment),
-              :configured_environment => configured_environment,
-              :ignore_cache => true,
-              :transaction_uuid => @transaction_uuid,
-              :fail_on_404 => false)
-          found = true
-        rescue
-          # Nothing to see here
-        end
-      end
-      found
-    end
-    { :node => node,
-      :server => selected_server }
-  end
-  private :find_functional_server
 
   def send_report(report)
     puts report.summary if Puppet[:summarize]
