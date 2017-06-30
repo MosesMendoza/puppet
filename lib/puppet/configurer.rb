@@ -453,6 +453,12 @@ class Puppet::Configurer
     node 
   end
 
+  # If we're running in agent mode, our run_mode will be :agent
+  # If we're running in apply mode, our run_mode will be :user
+  def running_via_puppet_apply?
+    Puppet.run_mode.name == :user
+  end
+
   def execute_from_setting(setting)
     return true if (command = Puppet[setting]) == ""
 
