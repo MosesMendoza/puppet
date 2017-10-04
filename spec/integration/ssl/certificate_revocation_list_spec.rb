@@ -6,29 +6,25 @@ require 'puppet/ssl/certificate_revocation_list'
 describe Puppet::SSL::CertificateRevocationList do
   include PuppetSpec::Files
 
-  before do
-    # Get a safe temporary file
-    dir = tmpdir("ca_integration_testing")
+  let(:dir) { tmpdir("ca_integration_testing") }
 
+  before(:each) do
+    # Get a safe temporary file
     Puppet.settings[:confdir] = dir
     Puppet.settings[:vardir] = dir
-
     Puppet::SSL::Host.ca_location = :local
   end
 
-  after {
+  after do
     Puppet::SSL::Host.ca_location = :none
-
     # This is necessary so the terminus instances don't lie around.
     Puppet::SSL::Host.indirection.termini.clear
-  }
+  end
 
   it "should be able to read in written out CRLs with no revoked certificates" do
     ca = Puppet::SSL::CertificateAuthority.new
-
     raise "CRL not created" unless Puppet::FileSystem.exist?(Puppet[:hostcrl])
-
     crl = Puppet::SSL::CertificateRevocationList.new("crl_int_testing")
-    crl.read(Puppet[:hostcrl])
+    expect(crl.read(Puppet[:hostcrl])).to be_an_instance_of(OpenSSL::X509::CRL)
   end
 end
