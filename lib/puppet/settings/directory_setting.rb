@@ -12,7 +12,7 @@ class Puppet::Settings::DirectorySetting < Puppet::Settings::FileSetting
   #   for example, a:ASCII or w+:UTF-8
   def open_file(filename, option = 'r', &block)
     controlled_access do |mode|
-      Puppet::FileSystem.open(filename, mode, option, &block)
+      Puppet::FileSystem.exclusive_open(filename, mode, option, &block)
     end
   end
 end

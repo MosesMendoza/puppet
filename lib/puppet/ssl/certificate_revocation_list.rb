@@ -27,9 +27,9 @@ DOC
 
   # Knows how to create a CRL with our system defaults.
   def generate(cert, cakey)
+    @cert = cert
     Puppet.info _("Creating a new certificate revocation list")
-
-    create_crl_issued_by(cert)
+    create_crl_issued_by(@cert)
     start_at_initial_crl_number
     update_valid_time_range_to_start_at(Time.now)
     sign_with(cakey)
@@ -50,12 +50,31 @@ DOC
     Puppet.notice _("Revoked certificate with serial %{serial}") % { serial: serial }
     time = Time.now
 
+    reload_from_disk
+
     add_certificate_revocation_for(serial, reason, time)
     update_to_next_crl_number
     update_valid_time_range_to_start_at(time)
     sign_with(cakey)
-
+    puts "revoking cert with serial number #{serial}"
     Puppet::SSL::CertificateRevocationList.indirection.save(self)
+  end
+
+  def crl_is_stale?(name = Puppet::SSL::CA_NAME)
+    crl = Puppet::SSL::CertificateRevocationList.indirection.find(name, :ignore_cache => true)
+    crl.content.to_s != @content.to_s
+  end
+
+  def reload_from_disk(name = Puppet::SSL::CA_NAME)
+    puts "reloading CRL before write"
+    crl = Puppet::SSL::CertificateRevocationList.indirection.find(name, :ignore_cache => true)
+    if crl.nil?
+      Puppet.debug("Could not find existing CRL file to reload")
+      return nil
+    else
+      @content = crl.content
+      return @content
+    end
   end
 
 private

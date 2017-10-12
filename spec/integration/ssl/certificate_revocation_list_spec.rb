@@ -40,7 +40,7 @@ describe Puppet::SSL::CertificateRevocationList, :if => !Puppet.features.microso
     Puppet::SSL::Host.indirection.termini.clear
   end
 
-  let(:concurrency_volume) { 100 }
+  let(:concurrency_volume) { 2 }
 
   it "should be able to read in written out CRLs with no revoked certificates" do
     ca = Puppet::SSL::CertificateAuthority.new

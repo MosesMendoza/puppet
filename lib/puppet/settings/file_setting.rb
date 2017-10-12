@@ -192,6 +192,7 @@ class Puppet::Settings::FileSetting < Puppet::Settings::StringSetting
   #   for example, a:ASCII or w+:UTF-8
   def exclusive_open(option = 'r', &block)
     controlled_access do |mode|
+      puts "writing file #{file}"
       Puppet::FileSystem.exclusive_open(file(), mode, option, &block)
     end
   end

@@ -104,11 +104,18 @@ class Puppet::SSL::CertificateAuthority
       unless @crl = Puppet::SSL::CertificateRevocationList.indirection.find(Puppet::SSL::CA_NAME)
         @crl = Puppet::SSL::CertificateRevocationList.new(Puppet::SSL::CA_NAME)
         @crl.generate(host.certificate.content, host.key.content)
+
+        # Not thread/process safe. If two puppet instances simultaneously detect there are no CRLs, both will try to load and write them, one overwriting the other
+        # Not even sure what happens when we get further on in the process (ie when we try to add a revocation to the CRL)
         Puppet::SSL::CertificateRevocationList.indirection.save(@crl)
       end
     end
     @crl
   end
+
+#  def reload_crl
+#    @crl = Puppet::SSL::CertificateRevocationList.indirection.find(Puppet::SSL::CA_NAME)
+#  end
 
   # Delegates this to our Host class.
   def destroy(name)
@@ -256,6 +263,7 @@ class Puppet::SSL::CertificateAuthority
               elsif name =~ /^0x[0-9A-Fa-f]+$/
                 [name.hex]
               else
+                # TODO concurrent read access safety?
                 inventory.serials(name)
               end
 

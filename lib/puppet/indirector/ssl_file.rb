@@ -170,12 +170,12 @@ class Puppet::Indirector::SslFile < Puppet::Indirector::Terminus
     # Puppet::SSL::Key by Puppet::SSL::Key::Ca, Puppet::SSL::Key::File
     # -----BEGIN RSA PRIVATE KEY-----
     if ca?(name) and ca_location
-      Puppet.settings.setting(self.class.ca_setting).open('w:ASCII') { |f| yield f }
+      Puppet.settings.setting(self.class.ca_setting).exclusive_open('w:ASCII') { |f| yield f }
     # Serialization of:
     # Puppet::SSL::CertificateRevocationList by Puppet::SSL::CertificateRevocationList::Ca, Puppet::SSL::CertificateRevocationList::File
     # -----BEGIN X509 CRL-----
     elsif file_location
-      Puppet.settings.setting(self.class.file_setting).open('w:ASCII') { |f| yield f }
+      Puppet.settings.setting(self.class.file_setting).exclusive_open('w:ASCII') { |f| yield f }
     # Serialization of:
     # Puppet::SSL::Certificate by Puppet::SSL::Certificate::Ca, Puppet::SSL::Certificate::File
     # -----BEGIN CERTIFICATE-----

@@ -33,7 +33,7 @@ class Puppet::Settings::FileOrDirectorySetting < Puppet::Settings::FileSetting
       super
     else
       controlled_access do |mode|
-        Puppet::FileSystem.open(filename, mode, option, &block)
+        Puppet::FileSystem.exclusive_open(filename, mode, option, &block)
       end
     end
   end
